@@ -1,10 +1,15 @@
 import akka.util.ByteString
 import com.scalamc.actors.ConnectionHandler
+import com.scalamc.models.enums.Difficulty.{DifficultyVal, Easy}
+import com.scalamc.models.enums.Dimension.{DimensionVal, Overworld}
+import com.scalamc.models.enums.GameMode.{Creative, GameModeVal}
+import com.scalamc.models.enums.LevelType.{Default, LevelTypeVal}
+import com.scalamc.objects.ServerStats
 import com.scalamc.packets.{Packet, PacketInfo}
-import com.scalamc.packets.login.LoginStartPacket
-import com.scalamc.packets.login.LoginSuccess
+import com.scalamc.packets.login.{JoinGamePacket, LoginStartPacket, LoginSuccessPacket}
 import org.scalatest.{FeatureSpec, FunSuite, GivenWhenThen, Matchers}
 import com.scalamc.utils.{ByteBuffer, PacketStack}
+import com.scalamc.utils.BytesUtils._
 import org.clapper.classutil.ClassInfo
 
 class PacketTest extends FunSuite with GivenWhenThen with Matchers {
@@ -94,6 +99,28 @@ class PacketTest extends FunSuite with GivenWhenThen with Matchers {
     val stackPacket = new PacketStack(data.toArray)
     stackPacket.handlePackets((packet)=>{pingPacket = packet})
     assert(pingPacket == new ByteBuffer(Array(0, 1, 1, 1, 1, 1)))
+  }
+
+  test("WritePacketTest"){
+
+
+    // Given
+    var id: Int = 0
+    var gamemode: GameModeVal = Creative
+    var dimension: DimensionVal = Overworld
+    var difficulty: DifficultyVal = Easy
+    var maxPlayer: Byte = ServerStats.serverStats.players.max.toByte
+    var levelType: LevelTypeVal = Default
+    var reducedDebugInfo: Boolean = true
+
+    val packet = new JoinGamePacket(id, gamemode, dimension, difficulty, maxPlayer, levelType, reducedDebugInfo).write()
+    Given(javax.xml.bind.DatatypeConverter.printHexBinary(packet.toArray))
+    var comp = new ByteBuffer()+Array(0x23.toByte)+id+gamemode.toBytes+dimension.toBytes+difficulty.toBytes+Array(maxPlayer)+levelType.toBytes+Array(1)
+    var lenBuff = new ByteBuffer()
+    lenBuff.writeVarInt(comp.length)
+    comp = lenBuff + comp.toArray
+    println(comp)
+    assert(packet == comp)
   }
 
 }

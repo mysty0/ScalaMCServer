@@ -2,7 +2,8 @@ package com.scalamc.models
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.Tcp.Write
-import com.scalamc.packets.login.LoginStartPacket
+import com.scalamc.packets.login.{JoinGamePacket, LoginStartPacket, LoginSuccessPacket}
+import java.util.UUID.randomUUID
 
 
 
@@ -18,7 +19,9 @@ class Session(connect: ActorRef, var name: String = "") extends Actor with Actor
       name = p.name
       println(name)
       println(sender())
-      //sender() ! Write()
+      sender() ! Write(new LoginSuccessPacket(randomUUID().toString, name))
+
+      sender() ! Write(new JoinGamePacket())
     }
   }
 

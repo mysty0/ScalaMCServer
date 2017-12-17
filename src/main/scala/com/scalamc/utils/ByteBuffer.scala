@@ -14,9 +14,12 @@ class ByteBuffer extends ArrayBuffer[Byte](){
     this.insertAll(this.length, bytes)
   }
 
+  def +(bytes: Array[Byte]): ByteBuffer ={
+    this.insertAll(this.length, bytes)
+    this
+  }
 
-
-  def writeWarInt(v: Int): Unit = {
+  def writeVarInt(v: Int): Unit = {
     var value = v
     do {
       var temp = (value & 0x7F).toByte
@@ -54,8 +57,8 @@ class PacketStack extends mutable.ArrayStack[Byte](){
   def handlePackets(parsePacketHandler: (ByteBuffer) => Unit) = {
     try {
       while (nonEmpty) parsePacketHandler(popPacketWith(popPacketLength()))
-    } catch() = case _ => {
-      print()
+    } catch {
+      case e: Exception => println(e)
     }
   }
 

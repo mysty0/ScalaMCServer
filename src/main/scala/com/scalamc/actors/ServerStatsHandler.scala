@@ -24,9 +24,9 @@ class ServerStatsHandler extends Actor{
       //res += (2 + bStat.length).toByte
       //res += 0x00.toByte
       //res += bStat.length.toByte
-      res.writeWarInt(2 + bStat.length)
-      res.writeWarInt(0)
-      res.writeWarInt(bStat.length)
+      res.writeVarInt(2 + bStat.length)
+      res.writeVarInt(0)
+      res.writeVarInt(bStat.length)
       //VarInt.writeVarInt(2 + bStat.length, res)
       //VarInt.writeVarInt(0, res)
       //VarInt.writeVarInt(bStat.length, res)

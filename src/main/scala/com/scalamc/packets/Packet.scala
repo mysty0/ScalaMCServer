@@ -3,7 +3,11 @@ package com.scalamc.packets
 import java.io.File
 
 import akka.util.ByteString
+import com.scalamc.models.VarInt
+import com.scalamc.models.enums.PacketEnum
+import com.scalamc.models.enums.PacketEnum.EnumVal
 import com.scalamc.utils.ByteBuffer
+import com.scalamc.utils.BytesUtils._
 import org.clapper.classutil.{ClassFinder, ClassInfo}
 
 import scala.util.Try
@@ -56,6 +60,8 @@ object Packet{
     packet.read(buf)
     packet
   }
+
+  implicit def packet2ByteStrign(pack: Packet) = ByteString(pack.write().toArray)
 }
 
 object PacketState extends Enumeration {
@@ -84,16 +90,30 @@ abstract class Packet(val packetInfo: PacketInfo) {
   }
 
   def write(): ByteBuffer ={
-    var byteBuffer: ByteBuffer = new ByteBuffer()
+    var buff: ByteBuffer = new ByteBuffer()
+
     val accessors = rm.classSymbol(this.getClass).toType.members.collect {
-      case m: MethodSymbol if m.isSetter && m.isPublic => m
-    }
+      case m: MethodSymbol if m.isGetter && m.isPublic => m
+    }.toList.reverse
 
     val instanceMirror = rm.reflect(this)
     for(acc <- accessors){
-      print(acc.getClass==classOf[String])
+      println( instanceMirror.reflectMethod(acc).apply())
+      instanceMirror.reflectMethod(acc).apply() match {
+        case str: String => buff += str
+        case int: Int => buff += int
+        case varInt: VarInt => buff.writeVarInt(varInt.int)
+        case enum: EnumVal => buff += enum.toBytes
+        case bool: Boolean => buff += (if(bool) 1.toByte else 0.toByte)
+        case pi: PacketInfo => buff += pi.id
+        case byte: Byte => buff += byte
+      }
+
     }
-    byteBuffer
+    var lenBuff = new ByteBuffer()
+    lenBuff.writeVarInt(buff.length)
+
+    lenBuff+buff.toArray
   }
 
 }

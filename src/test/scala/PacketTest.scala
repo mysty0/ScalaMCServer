@@ -1,39 +1,99 @@
+import akka.util.ByteString
+import com.scalamc.actors.ConnectionHandler
 import com.scalamc.packets.{Packet, PacketInfo}
 import com.scalamc.packets.login.LoginStartPacket
 import com.scalamc.packets.login.LoginSuccess
 import org.scalatest.{FeatureSpec, FunSuite, GivenWhenThen, Matchers}
-import com.scalamc.utils.ByteBuffer
+import com.scalamc.utils.{ByteBuffer, PacketStack}
 import org.clapper.classutil.ClassInfo
 
 class PacketTest extends FunSuite with GivenWhenThen with Matchers {
-  test("reading_packet") {
-    Given("Buffer and packet")
-    val buffer = new ByteBuffer()
-    val packet = new LoginStartPacket()
+//  test("reading_packet") {
+//    Given("Buffer and packet")
+//    val buffer = new ByteBuffer()
+//    val packet = new LoginStartPacket()
+//
+//    When("read the packet")
+//    packet.read(buffer)
+//    println(s"name ${packet.name}")
+//    Then("the read complite")
+//    assert(packet.name != "")
+//  }
+//
+//  test("get_packet") {
+//    Given("packet")
+//    Packet
+//    When("get")
+//    //packet.read(buffer)
+//    println(s"name ${Packet.packets.last._2.newInstance()}")
+//    Then("the get complite")
+//    assert(Packet.packets.nonEmpty)
+//  }
+//
+//  test("write_packet"){
+//    Given("packet")
+//    var packet = new LoginSuccess("123", "123")
+//    When("write")
+//    var buff = packet.write()
+//    Then("buff")
+//  }
 
-    When("read the packet")
-    packet.read(buffer)
-    println(s"name ${packet.name}")
-    Then("the read complite")
-    assert(packet.name != "")
+  test("ReadPacketLengthTest") {
+    // Given
+    val data = ByteString(9, 1, 1, 2, 3, 4, 5, 6, 7, 8)
+    var pingPacket: ByteBuffer = null
+    val stackPacket = new PacketStack(data.toArray)
+
+    // When
+    val len = stackPacket.popPacketLength()
+
+    // Then
+    assert(len == 9)
   }
 
-  test("get_packet") {
-    Given("packet")
-    Packet
-    When("get")
-    //packet.read(buffer)
-    println(s"name ${Packet.packets.last._2.newInstance()}")
-    Then("the get complite")
-    assert(Packet.packets.nonEmpty)
+  test("ReadPacketLengthEdgeTest") {
+    // Given
+    val data = ByteString(127, 1, 1, 2, 3, 4, 5, 6, 7, 8)
+    var pingPacket: ByteBuffer = null
+    val stackPacket = new PacketStack(data.toArray)
+
+    // When
+    val len = stackPacket.popPacketLength()
+
+    // Then
+    assert(len == 127)
   }
 
-  test("write_packet"){
-    Given("packet")
-    var packet = new LoginSuccess("123", "123")
-    When("write")
-    var buff = packet.write()
-    Then("buff")
+  test("ReadPacketLengthMultiByteTest") {
+    // Given
+    val data = ByteString(255, 255, 255, 255, 7 , 1, 1, 2, 3, 4, 5, 6, 7, 8)
+    var pingPacket: ByteBuffer = null
+    val stackPacket = new PacketStack(data.toArray)
+
+    // When
+    val len = stackPacket.popPacketLength()
+
+    // Then
+    assert(len == 2147483647)
+  }
+
+
+  test("ReadPingPacketTest") {
+    val data = ByteString(9, 1, 1, 2, 3, 4, 5, 6, 7, 8)
+    Given(data.toString())
+    var pingPacket: ByteBuffer = null
+    val stackPacket = new PacketStack(data.toArray)
+    stackPacket.handlePackets((packet)=>{pingPacket = packet})
+    assert(pingPacket == new ByteBuffer(Array(1, 1, 2, 3, 4, 5, 6, 7, 8)))
+  }
+
+  test("ReadPingAndLoginPacketTest") {
+    val data = ByteString(9, 1, 1, 2, 3, 4, 5, 6, 7, 8, 6, 0, 1, 1, 1, 1, 1)
+    Given(data.toString())
+    var pingPacket: ByteBuffer = null
+    val stackPacket = new PacketStack(data.toArray)
+    stackPacket.handlePackets((packet)=>{pingPacket = packet})
+    assert(pingPacket == new ByteBuffer(Array(0, 1, 1, 1, 1, 1)))
   }
 
 }

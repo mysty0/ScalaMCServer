@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp.Write
 import akka.util.ByteString
 import com.scalamc.objects.ServerStats
-import com.scalamc.utils.{ByteBuffer, VarInt}
+import com.scalamc.utils.ByteBuffer
 import io.circe.generic.auto._
 import io.circe.syntax._
 

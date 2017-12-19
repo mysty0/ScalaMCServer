@@ -7,7 +7,7 @@ import com.scalamc.models.enums.LevelType._
 import com.scalamc.objects.ServerStats
 import com.scalamc.packets.{Packet, PacketDirection, PacketInfo, PacketState}
 
-class JoinGamePacket(var id: Int = 0,
+case class JoinGamePacket(var id: Int = 0,
                      var gamemode: GameModeVal = Creative,
                      var dimension: DimensionVal = Overworld,
                      var difficulty: DifficultyVal = Easy,

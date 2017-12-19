@@ -30,55 +30,7 @@ class ByteBuffer extends ArrayBuffer[Byte](){
     } while (value != 0)
   }
 
-  def readVarInt(ind: Int): Int = {
-    var numRead = 0
-    var result = 0
-    var read = 0.toByte
-    var curInt = ind
-    do {
-      read = this(curInt)
-      curInt += 1
-      val value = read & 0x7F
-      result |= (value << (7 * numRead))
-      numRead += 1
-      if (numRead > 5) throw new RuntimeException("VarInt is too big")
-    } while ((read & 0x80) != 0)
-    result
-  }
+  def readVarInt(ind: Int): Int = BytesUtils.readVarInt(ind, i=>this(i))
+
 }
 
-class PacketStack extends mutable.ArrayStack[Byte](){
-
-  def this(bytes: Array[Byte]){
-    this
-    this ++= bytes.reverse
-  }
-
-  def handlePackets(parsePacketHandler: (ByteBuffer) => Unit) = {
-    try {
-      while (nonEmpty) parsePacketHandler(popPacketWith(popPacketLength()))
-    } catch {
-      case e: Exception => println(e)
-    }
-  }
-
-  def popPacketLength(): Int = {
-    var numRead = 0
-    var result = 0
-    var read = 0.toByte
-    do {
-      read = this.pop()
-      val value = read & 0x7F
-      result |= (value << (7 * numRead))
-      numRead += 1
-      if (numRead > 5) throw new RuntimeException("VarInt is too big")
-    } while ((read & 0x80) != 0)
-    result
-  }
-
-  def popPacketWith(len: Int): ByteBuffer = {
-    var packet = new ByteBuffer()
-    (0 until len).map((_) => packet += pop())
-    packet
-   }
-}

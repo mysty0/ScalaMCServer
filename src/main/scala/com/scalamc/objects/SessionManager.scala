@@ -1,7 +1,7 @@
 package com.scalamc.objects
 
 import akka.actor.{ActorContext, ActorRef}
-import com.scalamc.models.{Session}
+import com.scalamc.actors.Session
 
 import scala.collection.mutable.ArrayBuffer
 

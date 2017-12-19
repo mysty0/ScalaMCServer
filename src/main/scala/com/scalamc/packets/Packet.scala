@@ -3,10 +3,10 @@ package com.scalamc.packets
 import java.io.File
 
 import akka.util.ByteString
-import com.scalamc.models.VarInt
+import com.scalamc.models.{VarInt, VarLong}
 import com.scalamc.models.enums.PacketEnum
 import com.scalamc.models.enums.PacketEnum.EnumVal
-import com.scalamc.utils.ByteBuffer
+import com.scalamc.utils.{ByteBuffer, ByteStack}
 import com.scalamc.utils.BytesUtils._
 import org.clapper.classutil.{ClassFinder, ClassInfo}
 
@@ -56,12 +56,14 @@ object Packet{
 
   def fromByteBuffer(buf: ByteBuffer, state: PacketState.Value = PacketState.Playing): Packet ={
     val packet = getPacket(buf(0), state).newInstance()
-    buf.take(0)
+    buf.remove(0)
     packet.read(buf)
     packet
   }
 
-  implicit def packet2ByteStrign(pack: Packet) = ByteString(pack.write().toArray)
+  implicit def pack2ArrayBuff(pack: Packet): ByteBuffer = pack.write()
+
+  implicit def packet2ByteStrign(pack: Packet) = ByteString(pack.toArray)
 }
 
 object PacketState extends Enumeration {
@@ -71,21 +73,27 @@ object PacketDirection extends Enumeration {
   val Server, Client = Value
 }
 
-case class PacketInfo(id: Byte, state: PacketState.Value, direction: PacketDirection.Value)
+case class PacketInfo(id: Byte, state: PacketState.Value = PacketState.Playing, direction: PacketDirection.Value)
 
 abstract class Packet(val packetInfo: PacketInfo) {
   import scala.reflect.runtime.universe._
   def read(byteBuffer: ByteBuffer): Unit ={
-
+    var stack = new ByteStack(byteBuffer.toArray)
     val accessors = rm.classSymbol(this.getClass).toType.members.collect {
-      case m: MethodSymbol if m.isSetter && m.isPublic => m
-    }
+      case m: TermSymbol if m.isVar => m
+    }.toList.reverse
 
     val instanceMirror = rm.reflect(this)
     for(acc <- accessors){
-      if(accessors.size == 1) {
-        instanceMirror.reflectMethod(acc).apply(ByteString(byteBuffer.toArray).decodeString("utf-8"))
+      println("sig", acc.name)
+      acc.typeSignature match {
+        case s if s =:= typeOf[String] =>
+          val len = stack.popVarInt()
+          instanceMirror.reflectField(acc).set(ByteString(stack.popWith(len).toArray).decodeString("utf-8"))
+        case i if i =:= typeOf[VarInt] =>
+          instanceMirror.reflectField(acc).set(VarInt(stack.popVarInt()))
       }
+
     }
   }
 
@@ -98,7 +106,7 @@ abstract class Packet(val packetInfo: PacketInfo) {
 
     val instanceMirror = rm.reflect(this)
     for(acc <- accessors){
-      println( instanceMirror.reflectMethod(acc).apply())
+      //println( instanceMirror.reflectMethod(acc).apply())
       instanceMirror.reflectMethod(acc).apply() match {
         case str: String => buff += str
         case int: Int => buff += int
@@ -107,8 +115,10 @@ abstract class Packet(val packetInfo: PacketInfo) {
         case bool: Boolean => buff += (if(bool) 1.toByte else 0.toByte)
         case pi: PacketInfo => buff += pi.id
         case byte: Byte => buff += byte
+        case pos: com.scalamc.models.Position => buff += pos.toLong
+        case long: VarLong =>
       }
-
+      println(javax.xml.bind.DatatypeConverter.printHexBinary(buff.toArray))
     }
     var lenBuff = new ByteBuffer()
     lenBuff.writeVarInt(buff.length)

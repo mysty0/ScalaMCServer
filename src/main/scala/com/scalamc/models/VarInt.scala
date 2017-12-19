@@ -1,3 +1,3 @@
 package com.scalamc.models
 
-class VarInt(var int: Int)
+case class VarInt(var int: Int)

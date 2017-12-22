@@ -4,7 +4,8 @@ import java.util.UUID.randomUUID
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.Tcp.Write
-import com.scalamc.packets.game.{KeepAliveClientPacket, KeepAliveServerPacket, SpawnPositionPacket}
+import com.scalamc.models.{Player, Server}
+import com.scalamc.packets.game.{KeepAliveClientPacket, KeepAliveServerPacket, PositionAndLookPacketClient, SpawnPositionPacket}
 import com.scalamc.packets.login.{JoinGamePacket, LoginStartPacket, LoginSuccessPacket}
 
 
@@ -30,6 +31,10 @@ class Session(connect: ActorRef, var name: String = "") extends Actor with Actor
       sender() ! ChangeState(ConnectionState.Playing)
 
       connect ! Write(SpawnPositionPacket())
+
+      connect ! Write(PositionAndLookPacketClient())
+
+      Server.players += Player(name, this)
     }
     case p: KeepAliveClientPacket =>
       connect ! Write(KeepAliveServerPacket(p.id))

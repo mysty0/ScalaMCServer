@@ -14,6 +14,16 @@ object BytesUtils {
     b
   }
 
+  implicit def doubleToBytes(double: Double): Array[Byte] = {
+    val l: Long = java.lang.Double.doubleToRawLongBits(double)
+    Array[Byte](((l >> 56) & 0xff).toByte, ((l >> 48) & 0xff).toByte, ((l >> 40) & 0xff).toByte, ((l >> 32) & 0xff).toByte, ((l >> 24) & 0xff).toByte, ((l >> 16) & 0xff).toByte, ((l >> 8) & 0xff).toByte, ((l >> 0) & 0xff).toByte)
+  }
+
+  implicit def floatToBytes(float: Float): Array[Byte] = {
+    val bits = java.lang.Float.floatToIntBits(float)
+    Array[Byte]((bits & 0xff).toByte, ((bits >> 8) & 0xff).toByte, ((bits >> 16) & 0xff).toByte, ((bits >> 24) & 0xff).toByte)
+  }
+
   implicit def string2Bytes(str: String): Array[Byte] = {
     var buff = new ByteBuffer()
     var strBytes = ByteString(str).toArray

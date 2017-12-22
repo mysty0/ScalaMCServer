@@ -20,20 +20,13 @@ object VariableValueArray {
 }
 
 final class VariableValueArray(val bitsPerValue: Int, val capacity: Int) extends Cloneable {
-  if (capacity < 0) throw new IllegalArgumentException(String.format("capacity (%s) must not be negative", capacity))
-  if (bitsPerValue < 1) throw new IllegalArgumentException(String.format("bitsPerValue (%s) must not be less than 1", bitsPerValue))
-  if (bitsPerValue > 64) throw new IllegalArgumentException(String.format("bitsPerValue (%s) must not be greater than 64", bitsPerValue))
+  //if (capacity < 0) throw new IllegalArgumentException(String.format("capacity (%s) must not be negative", capacity))
+  //if (bitsPerValue < 1) throw new IllegalArgumentException(String.format("bitsPerValue (%s) must not be less than 1", bitsPerValue))
+  //if (bitsPerValue > 64) throw new IllegalArgumentException(String.format("bitsPerValue (%s) must not be greater than 64", bitsPerValue))
 
   var backing = new Array[Long](Math.ceil((bitsPerValue * capacity) / 64.0).toInt)
   var valueMask = (1L << bitsPerValue) - 1L
 
-  def getBacking: Array[Long] = backing
-
-  def getCapacity: Int = capacity
-
-  def getBitsPerValue: Int = bitsPerValue
-
-  def getLargestPossibleValue: Long = valueMask
 
   def apply(index: Int): Int = {
     var ind = index
@@ -50,11 +43,11 @@ final class VariableValueArray(val bitsPerValue: Int, val capacity: Int) extends
     (value & valueMask).toInt
   }
 
-  def set(index: Int, value: Int): Unit = {
+  def update(index: Int, value: Int): Unit = {
     var ind = index
     checkIndex(ind)
-    if (value < 0) throw new IllegalArgumentException(String.format("value (%s) must not be negative", value))
-    if (value > valueMask) throw new IllegalArgumentException(String.format("value (%s) must not be greater than %s", value, valueMask))
+    //if (value < 0) throw new IllegalArgumentException(String.format("value (%s) must not be negative", value))
+    //if (value > valueMask) throw new IllegalArgumentException(String.format("value (%s) must not be greater than %s", value, valueMask))
     ind *= bitsPerValue
     var i0 = ind >> 6
     val i1 = ind & 0x3f
@@ -67,8 +60,8 @@ final class VariableValueArray(val bitsPerValue: Int, val capacity: Int) extends
   }
 
   private def checkIndex(index: Int): Unit = {
-    if (index < 0) throw new IndexOutOfBoundsException(String.format("index (%s) must not be negative", index))
-    if (index >= capacity) throw new IndexOutOfBoundsException(String.format("index (%s) must not be greater than the capacity (%s)", index, capacity))
+   // if (index < 0) throw new IndexOutOfBoundsException(String.format("index (%s) must not be negative", index))
+    //if (index >= capacity) throw new IndexOutOfBoundsException(String.format("index (%s) must not be greater than the capacity (%s)", index, capacity))
   }
 
   /**
@@ -89,10 +82,8 @@ final class VariableValueArray(val bitsPerValue: Int, val capacity: Int) extends
     else if (newBitsPerValue == this.bitsPerValue) throw new IllegalArgumentException("Cannot resize to the same size!  (size was " + newBitsPerValue + ")")
     val returned = new VariableValueArray(newBitsPerValue, this.capacity)
     var i = 0
-    while ( {
-      i < this.capacity
-    }) {
-      returned.set(i, this.get(i))
+    while (i < this.capacity) {
+      returned(i) = this(i)
 
       {
         i += 1; i - 1

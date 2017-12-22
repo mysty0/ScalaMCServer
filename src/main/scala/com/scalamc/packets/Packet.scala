@@ -117,6 +117,8 @@ abstract class Packet(val packetInfo: PacketInfo) {
         case byte: Byte => buff += byte
         case pos: com.scalamc.models.Position => buff += pos.toLong
         case long: VarLong =>
+        case double: Double => buff += double
+        case float: Float => buff += float
       }
       println(javax.xml.bind.DatatypeConverter.printHexBinary(buff.toArray))
     }

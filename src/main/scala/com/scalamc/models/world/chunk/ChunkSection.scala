@@ -25,13 +25,16 @@ object ChunkSection {
   val GLOBAL_PALETTE_BITS_PER_BLOCK = 13
 }
 
-class ChunkSection{
+class ChunkSection(){
 
   var count = 0
   var palette = Array[Int]()
   var data:VariableValueArray = _
   private var skyLight = new NibbleArray(ChunkSection.ARRAY_SIZE, ChunkSection.DEFAULT_SKYLIGHT.toByte)
   private var blockLight = new NibbleArray(ChunkSection.ARRAY_SIZE, ChunkSection.DEFAULT_SKYLIGHT.toByte)
+
+  loadTypeArray(new Array[Int](ChunkSection.ARRAY_SIZE))
+
 
   def index(x: Int, y: Int, z: Int): Int = {
     if (x < 0 || z < 0 || x >= Chunk.WIDTH || z >= Chunk.HEIGHT) throw new IndexOutOfBoundsException("Coords (x=" + x + ",z=" + z + ") out of section bounds")

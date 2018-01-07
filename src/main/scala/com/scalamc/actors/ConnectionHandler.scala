@@ -8,6 +8,7 @@ import akka.util.ByteString
 import com.scalamc.objects.SessionManager
 import com.scalamc.packets.{Packet, PacketState}
 import com.scalamc.packets.login.LoginStartPacket
+import com.scalamc.packets.status.Handshake
 import com.scalamc.utils._
 
 import scala.collection.mutable
@@ -17,48 +18,54 @@ object ConnectionState extends Enumeration{
 }
 case class ChangeState(state: ConnectionState.Value)
 
-class ConnectionHandler extends Actor{
-    import akka.io.Tcp._
+class ConnectionHandler extends Actor {
 
-    val starsService = context.actorSelection("/user/stats")
+  import akka.io.Tcp._
 
-    var session: ActorRef = _
+  val statsService = context.actorSelection("/user/stats")
 
-    var state: ConnectionState.Value = ConnectionState.Login
+  var session: ActorRef = _
 
-    def receive = {
-      case Received(data) => {
-        implicit val dataForParser = data
-        println("packet ", javax.xml.bind.DatatypeConverter.printHexBinary(data.toArray))
-        val stack = new PacketStack(data.toArray)
-        stack.handlePackets(parsePacket)
+  var state: ConnectionState.Value = ConnectionState.Login
 
-      }
-      case cs: ChangeState =>
-        println("chage state")
-        state = cs.state
+  var protocolId = 0
 
-      case PeerClosed     => context stop self
+  def receive = {
+    case Received(data) => {
+      implicit val dataForParser = data
+      println("packet ", javax.xml.bind.DatatypeConverter.printHexBinary(data.toArray))
+      val stack = new PacketStack(data.toArray)
+      stack.handlePackets(parsePacket)
+
     }
+    case cs: ChangeState =>
+      println("chage state")
+      state = cs.state
+
+    case PeerClosed => context stop self
+  }
 
   private def parsePacket(packet: ByteBuffer)(implicit data: ByteString) = {
     val packetId = packet(0)
     if (session != null) {
-      session ! Packet.fromByteBuffer(packet, if (state==ConnectionState.Login)PacketState.Login else PacketState.Playing)
+      println("packet id", packetId)
+      session ! Packet.fromByteBuffer(packet, if (state == ConnectionState.Login) PacketState.Login else PacketState.Playing)
 
     } else {
-
+      println("packet ", javax.xml.bind.DatatypeConverter.printHexBinary(packet.toArray))
 
       if (packetId == 0 && packet.last == 1)
-        starsService ! SendStat(sender())
+        statsService ! SendStat(sender(), Packet.fromByteBuffer(packet, PacketState.Status).asInstanceOf[Handshake].protocolVersion.int)
       if (packetId == 0 && packet.last == 2) {
-        //SessionManager.createSession(sender = sender())
+        protocolId = Packet.fromByteBuffer(packet, PacketState.Status).asInstanceOf[Handshake].protocolVersion.int
         session = context.actorOf(Session.props(sender()))
       }
+
       if (packetId == 1 && packet.length > 1) {
         println("pong")
         sender() ! Write(data)
       }
     }
   }
+
 }

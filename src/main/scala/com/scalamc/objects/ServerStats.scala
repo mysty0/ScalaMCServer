@@ -8,7 +8,7 @@ import io.circe.generic.JsonCodec
 @JsonCodec case class StatsPlayers(max:Int, online:Int, sample: Array[StatsPlayer])
 @JsonCodec case class StatsDescription(text: String)
 
-case class ServerStats(version: ServerVersion = ServerVersion("1.11.2", 316),
+case class ServerStats(version: ServerVersion = ServerVersion("1.12.2", 340),
                        players: StatsPlayers = StatsPlayers(100, 0, new Array[StatsPlayer](0)),
                        description:StatsDescription = StatsDescription("Hello world")) {
   //var version = ServerVersion("1.11.2", 316)
@@ -17,5 +17,6 @@ case class ServerStats(version: ServerVersion = ServerVersion("1.11.2", 316),
 }
 object ServerStats{
   val serverStats = ServerStats()
+  def getStatusWithProtocolId(id: Int) = ServerStats(ServerVersion("1.12.2", id))
 }
 

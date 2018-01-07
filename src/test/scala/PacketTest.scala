@@ -25,15 +25,15 @@ class PacketTest extends FunSuite with GivenWhenThen with Matchers {
 //    assert(packet.name != "")
 //  }
 //
-//  test("get_packet") {
-//    Given("packet")
-//    Packet
-//    When("get")
-//    //packet.read(buffer)
-//    println(s"name ${Packet.packets.last._2.newInstance()}")
-//    Then("the get complite")
-//    assert(Packet.packets.nonEmpty)
-//  }
+  test("get_packet") {
+    Given("packet")
+    Packet
+    When("get")
+    //packet.read(buffer)
+    println(s"name ${Packet.packets.last._2.newInstance()}")
+    Then("the get complite")
+    assert(Packet.packets.nonEmpty)
+  }
 //
 //  test("write_packet"){
 //    Given("packet")

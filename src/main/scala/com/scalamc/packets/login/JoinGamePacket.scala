@@ -13,7 +13,7 @@ case class JoinGamePacket(var id: Int = 0,
                      var difficulty: DifficultyVal = Easy,
                      var maxPlayer: Byte = ServerStats.serverStats.players.max.toByte,
                      var levelType: LevelTypeVal = Default,
-                     var reducedDebugInfo: Boolean = true) extends Packet(PacketInfo(0x23.toByte, PacketState.Login, PacketDirection.Client)){
+                     var reducedDebugInfo: Boolean = false) extends Packet(PacketInfo(0x23.toByte, PacketState.Login, PacketDirection.Client)){
 
   def this(){this(0)}
 

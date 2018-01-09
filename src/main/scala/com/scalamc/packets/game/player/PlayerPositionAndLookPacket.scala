@@ -1,9 +1,9 @@
-package com.scalamc.packets.game
+package com.scalamc.packets.game.player
 
 import com.scalamc.models.VarInt
 import com.scalamc.packets.{Packet, PacketDirection, PacketInfo}
 
-case class PositionAndLookPacketClient(var x: Double = 0.0,
+case class PlayerPositionAndLookPacketClient(var x: Double = 0.0,
                                        var y: Double = 0.0,
                                        var z: Double = 0.0,
                                        var yaw: Float = 0.0f,
@@ -14,7 +14,7 @@ case class PositionAndLookPacketClient(var x: Double = 0.0,
   def this(){this(0.0)}
 }
 
-case class PositionAndLookPacketServer(var x: Double = 0.0,
+case class PlayerPositionAndLookPacketServer(var x: Double = 0.0,
                                        var y: Double = 0.0,
                                        var z: Double = 0.0,
                                        var yaw: Float = 0.0f,

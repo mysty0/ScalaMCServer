@@ -31,6 +31,7 @@ final class VariableValueArray(val bitsPerValue: Int, val capacity: Int) extends
   def apply(index: Int): Int = {
     var ind = index
     checkIndex(index)
+    if(bitsPerValue==0) return 0
     ind *= bitsPerValue
     var i0 = ind >> 6
     val i1 = ind & 0x3f
@@ -81,13 +82,8 @@ final class VariableValueArray(val bitsPerValue: Int, val capacity: Int) extends
     if (newBitsPerValue < this.bitsPerValue) throw new IllegalArgumentException("Cannot decrease bits per value!  (was " + this.bitsPerValue + ", new size " + newBitsPerValue + ")")
     else if (newBitsPerValue == this.bitsPerValue) throw new IllegalArgumentException("Cannot resize to the same size!  (size was " + newBitsPerValue + ")")
     val returned = new VariableValueArray(newBitsPerValue, this.capacity)
-    var i = 0
-    while (i < this.capacity) {
+    for (i <- 0 until this.capacity) {
       returned(i) = this(i)
-
-      {
-        i += 1; i - 1
-      }
     }
     returned
   }

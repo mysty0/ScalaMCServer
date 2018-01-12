@@ -28,7 +28,7 @@ class ConnectionHandler extends Actor {
 
   var state: ConnectionState.Value = ConnectionState.Login
 
-  var protocolId = 0
+  implicit var protocolId = 0
 
   def receive = {
     case Received(data) => {
@@ -58,7 +58,7 @@ class ConnectionHandler extends Actor {
         statsService ! SendStat(sender(), Packet.fromByteBuffer(packet, PacketState.Status).asInstanceOf[Handshake].protocolVersion.int)
       if (packetId == 0 && packet.last == 2) {
         protocolId = Packet.fromByteBuffer(packet, PacketState.Status).asInstanceOf[Handshake].protocolVersion.int
-        session = context.actorOf(Session.props(sender()))
+        session = context.actorOf(Session.props(sender(), protocolId))
       }
 
       if (packetId == 1 && packet.length > 1) {

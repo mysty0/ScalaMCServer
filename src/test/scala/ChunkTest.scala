@@ -20,6 +20,7 @@ class ChunkTest extends FunSuite with GivenWhenThen with Matchers {
     val groundUpContinues = true
     val sectionNum: Byte = 0
     val blockId = 10
+    implicit val protocolId = 340
 
     // when
     var chunk = new Chunk(x, z)

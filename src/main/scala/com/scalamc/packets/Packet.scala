@@ -53,18 +53,19 @@ object Packet{
 
   }
 
-  def getPacket(id: Byte, state: PacketState.Value = PacketState.Playing, direction: PacketDirection.Value = PacketDirection.Server) = packets.find((p)=>p._1.id==id&&p._1.state==state&&p._1.direction==direction).get._2
+  def getPacket(id: Byte, protocolId: Int, state: PacketState.Value = PacketState.Playing, direction: PacketDirection.Value = PacketDirection.Server) =
+    packets.find((p)=>(p._1.ids(protocolId)==id||p._1.ids(-1)==id)&&p._1.state==state&&p._1.direction==direction).get._2
 
-  def fromByteBuffer(buf: ByteBuffer, state: PacketState.Value = PacketState.Playing): Packet ={
-    val packet = getPacket(buf(0), state).newInstance()
+  def fromByteBuffer(buf: ByteBuffer, state: PacketState.Value = PacketState.Playing)(implicit protocolId: Int): Packet ={
+    val packet = getPacket(buf(0),protocolId, state).newInstance()
     buf.remove(0)
     packet.read(buf)
     packet
   }
 
-  implicit def pack2ArrayBuff(pack: Packet): ByteBuffer = pack.write()
+  implicit def pack2ArrayBuff(pack: Packet)(implicit protocolId: Int): ByteBuffer = pack.write()
 
-  implicit def packet2ByteStrign(pack: Packet) = ByteString(pack.toArray)
+  implicit def packet2ByteStrign(pack: Packet)(implicit protocolId: Int) = ByteString(pack.toArray)
 }
 
 object PacketState extends Enumeration {
@@ -74,7 +75,10 @@ object PacketDirection extends Enumeration {
   val Server, Client = Value
 }
 
-case class PacketInfo(id: Byte, state: PacketState.Value = PacketState.Playing, direction: PacketDirection.Value, var fields: List[(Any, scala.reflect.runtime.universe.TermSymbol)] = null)
+case class PacketInfo(var ids: Map[Int, Byte],
+                      state: PacketState.Value = PacketState.Playing,
+                      direction: PacketDirection.Value,
+                      var fields: List[(Any, scala.reflect.runtime.universe.TermSymbol)] = null)
 
 abstract class Packet(val packetInfo: PacketInfo) {
   import scala.reflect.runtime.universe._
@@ -84,6 +88,9 @@ abstract class Packet(val packetInfo: PacketInfo) {
   }
 
   implicit val instanceMirror = rm.reflect(this)
+
+  //Set default id
+  packetInfo.ids = packetInfo.ids.withDefault(_ => 0xFF.toByte)
 
   packetInfo.fields = rm.classSymbol(this.getClass).toType.members.collect {
     case m: TermSymbol if m.isVar => m
@@ -135,10 +142,12 @@ abstract class Packet(val packetInfo: PacketInfo) {
     }
   }
 
-  def write(): ByteBuffer ={
+  def write()(implicit protocolId: Int): ByteBuffer ={
     var buff: ByteBuffer = new ByteBuffer()
 
-    buff += packetInfo.id
+    var id = packetInfo.ids(protocolId)
+    buff += (if(id==0xFF.toByte) packetInfo.ids(-1) else id)
+    if(id==0xFF.toByte) println(packetInfo.ids)
 //    val accessors = rm.classSymbol(this.getClass).toType.members.collect {
 //      case m: MethodSymbol if m.isGetter && m.isPublic => m
 //    }.toList.reverse
@@ -152,7 +161,7 @@ abstract class Packet(val packetInfo: PacketInfo) {
         case varInt: VarInt => buff.writeVarInt(varInt.int)
         case enum: EnumVal => buff += enum.toBytes
         case bool: Boolean => buff += (if(bool) 1.toByte else 0.toByte)
-        case pi: PacketInfo => buff += pi.id
+        //case pi: PacketInfo => buff += pi.id
         case byte: Byte => buff += byte
         case pos: com.scalamc.models.Position => buff += pos.toLong
         case long: VarLong =>

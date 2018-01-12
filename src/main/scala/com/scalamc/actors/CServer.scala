@@ -20,7 +20,7 @@ class CServer(port:Int) extends Actor with ActorLogging {
 
     import context.system
     val opts = List(SO.KeepAlive(on = true), SO.TcpNoDelay(on = true))
-    IO(Tcp) ! Bind(self, new InetSocketAddress("localhost", port), options = opts)
+    IO(Tcp) ! Bind(self, new InetSocketAddress("192.168.1.143", port), options = opts)
   }
 
   //IO(Tcp) ! Bind(self, new InetSocketAddress("localhost", port))

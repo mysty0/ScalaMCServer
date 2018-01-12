@@ -20,7 +20,7 @@ class Chunk(x: Int, y: Int) {
 
   var sections = new Array[ChunkSection](16)
   var heightMap = Array[Byte]()
-  var biomes = Array[Byte]()
+  var biomes = new Array[Byte](256)
 
   def getSection(y: Int): ChunkSection ={
     sections(y/Chunk.SEC_DEPTH)

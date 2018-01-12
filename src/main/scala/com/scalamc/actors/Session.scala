@@ -14,12 +14,12 @@ import com.scalamc.packets.login.{JoinGamePacket, LoginStartPacket, LoginSuccess
 
 
 object Session{
-  def props(connect: ActorRef, name: String = "") = Props(
-    new Session(connect, name)
+  def props(connect: ActorRef, protocolId: Int = 0) = Props(
+    new Session(connect, protocolId = protocolId)
   )
 }
 
-class Session(connect: ActorRef, var name: String = "", var protocolId: Int = 0) extends Actor with ActorLogging {
+class Session(connect: ActorRef, var name: String = "", implicit var protocolId: Int = 0) extends Actor with ActorLogging {
   override def receive = {
     case p: LoginStartPacket =>{
       name = p.name
@@ -57,6 +57,9 @@ class Session(connect: ActorRef, var name: String = "", var protocolId: Int = 0)
     }
     case p: KeepAliveClientPacket =>
       connect ! Write(KeepAliveServerPacket(p.id))
+
+    case p: KeepAliveClientPacket335 =>
+      connect ! Write(KeepAliveServerPacket335(p.id))
 
     case p: PlayerPositionAndLookPacketServer =>
       println("pos and look ", p.x, p.y, p.z, p.yaw, p.pitch)

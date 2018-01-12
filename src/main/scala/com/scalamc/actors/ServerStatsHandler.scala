@@ -30,7 +30,7 @@ class ServerStatsHandler extends Actor{
 
       //println(javax.xml.bind.DatatypeConverter.printHexBinary(res.toArray))
       //println(ByteString(res.toArray))
-
+      implicit val protocolId = -1
       s ! Write(StatusPacket(stats))
 
     }

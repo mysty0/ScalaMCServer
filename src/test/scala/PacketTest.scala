@@ -112,8 +112,9 @@ class PacketTest extends FunSuite with GivenWhenThen with Matchers {
     var maxPlayer: Byte = ServerStats.serverStats.players.max.toByte
     var levelType: LevelTypeVal = Default
     var reducedDebugInfo: Boolean = true
+    implicit val protocolId = 340
 
-    val packet = new JoinGamePacket(id, gamemode, dimension, difficulty, maxPlayer, levelType, reducedDebugInfo).write()
+    val packet = JoinGamePacket(id, gamemode, dimension, difficulty, maxPlayer, levelType, reducedDebugInfo).write()
     Given(javax.xml.bind.DatatypeConverter.printHexBinary(packet.toArray))
     var comp = new ByteBuffer()+Array(0x23.toByte)+id+gamemode.toBytes+dimension.toBytes+difficulty.toBytes+Array(maxPlayer)+levelType.toBytes+Array(1)
     var lenBuff = new ByteBuffer()

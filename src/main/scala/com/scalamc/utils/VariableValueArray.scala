@@ -38,9 +38,7 @@ final class VariableValueArray(val bitsPerValue: Int, val capacity: Int) extends
     var value = backing(i0) >>> i1
     val i2 = i1 + bitsPerValue
     // The value is divided over two long values
-    if (i2 > 64) value |= backing({
-      i0 += 1; i0
-    }) << 64 - i1
+    if (i2 > 64) value |= backing(i0+1) << 64 - i1
     (value & valueMask).toInt
   }
 

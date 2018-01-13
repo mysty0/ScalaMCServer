@@ -39,7 +39,7 @@ class ChunkTest extends FunSuite with GivenWhenThen with Matchers {
     chunkSection.setBlock(0, 0, 0, Block(blockId, 0))
     var bufSection: ByteBuffer = new ByteBuffer()
     chunkSection.writeToBuff(bufSection, true)
-    assert(stack.popWith(stack.length - 1).toString() == bufSection.toString())
+    assert(stack.popWith(stack.length - 257).toString() == bufSection.toString())
   }
 
 }

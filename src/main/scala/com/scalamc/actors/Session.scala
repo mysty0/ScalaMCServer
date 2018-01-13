@@ -45,6 +45,12 @@ class Session(connect: ActorRef, var name: String = "", implicit var protocolId:
       connect ! Write(packet)
 
       connect ! Write(BlockChangePacket(Position(0, 4, 0), Block(5, 0.toByte)))
+
+      var emptChunk2 = new Chunk(1, 0)
+      emptChunk2.setBlock(0, 0, 0, Block(5, 0))
+      connect ! Write(emptChunk2.toPacket(true, true))
+
+      connect ! Write(BlockChangePacket(Position(0, 4, 0), Block(5, 0.toByte)))
 //      for(x <- 0 until 16)
 //        for(z <- 0 until 16)
 //          connect ! Write(BlockChangePacket(Position(x, 2, z), Block(5, 0.toByte)))

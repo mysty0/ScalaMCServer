@@ -83,11 +83,11 @@ class ChunkSection(){
         }
       }
     }
-    println("set block id", t, "pall id", encoded)
+    //println("set block id", t, "pall id", encoded)
     blocks(index(x, y, z)) = encoded
     blocks.backing.foreach(l => print(l.toHexString+" "))
-    println()
-    println("bpv", blocks.bitsPerValue)
+    //println()
+    //println("bpv", blocks.bitsPerValue)
   }
 
   def getBlock(x: Int, y: Int, z: Int) = {
@@ -98,7 +98,7 @@ class ChunkSection(){
 
   def writeToBuff(buff: ByteBuffer, skyLight: Boolean): Unit ={
     buff += blocks.bitsPerValue.toByte
-    println(javax.xml.bind.DatatypeConverter.printHexBinary(buff.toArray))
+    //println(javax.xml.bind.DatatypeConverter.printHexBinary(buff.toArray))
     if(palette != null && palette.nonEmpty) {
       buff.writeVarInt(palette.size)
       //palette.foreach(t => buff.writeVarInt(t))
@@ -106,13 +106,13 @@ class ChunkSection(){
       while(itr.hasNext) buff.writeVarInt(itr.next())
     } else buff.writeVarInt(0)
     //buff.writeVarInt(0)
-    println(javax.xml.bind.DatatypeConverter.printHexBinary(buff.toArray))
+    //println(javax.xml.bind.DatatypeConverter.printHexBinary(buff.toArray))
     buff.writeVarInt(blocks.backing.length)
     blocks.backing.foreach(l => buff += l)
 
     buff += blockLight.getRawData
     if(skyLight) buff += this.skyLight.getRawData
-    println(javax.xml.bind.DatatypeConverter.printHexBinary(buff.toArray))
+    //println(javax.xml.bind.DatatypeConverter.printHexBinary(buff.toArray))
   }
 
 }

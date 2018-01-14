@@ -58,7 +58,7 @@ class ConnectionHandler extends Actor {
         statsService ! SendStat(sender(), Packet.fromByteBuffer(packet, PacketState.Status).asInstanceOf[Handshake].protocolVersion.int)
       if (packetId == 0 && packet.last == 2) {
         protocolId = Packet.fromByteBuffer(packet, PacketState.Status).asInstanceOf[Handshake].protocolVersion.int
-        session = context.actorOf(Session.props(sender(), protocolId))
+        session = context.actorOf(MultiVersionSupportService.props(sender(), self, protocolId))
       }
 
       if (packetId == 1 && packet.length > 1) {

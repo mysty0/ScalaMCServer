@@ -17,15 +17,13 @@ class MultiVersionSupportService(client: ActorRef, connectionHandler: ActorRef, 
   val session = context.actorOf(Session.props(self))
 
   override def receive = {
-    case p: KeepAliveClientPacketOld =>
-    case p: KeepAliveClientPacket if protocolId >= 339 => client ! Write(p)
-    case p: KeepAliveClientPacket => client ! Write(KeepAliveServerPacketOld(VarInt(p.id.toInt)))
+    case p: KeepAliveServerPacket if protocolId >= 339 => client ! Write(p)
+    case p: KeepAliveServerPacket => client ! Write(KeepAliveServerPacketOld(VarInt(p.id.toInt)))
 
-    case p: KeepAliveServerPacket if protocolId >= 339 => session ! p
-    case p: KeepAliveServerPacketOld => client ! KeepAliveServerPacket(p.id.int.toLong)
+    case p: KeepAliveClientPacket if protocolId >= 339 => session ! p
+    case p: KeepAliveClientPacketOld => client ! KeepAliveServerPacket(p.id.int.toLong)
 
     case p: Packet =>
-      println("succ match")
       p.packetInfo.direction match{
         case PacketDirection.Client => client ! Write(p)
         case PacketDirection.Server => session ! p

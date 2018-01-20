@@ -20,7 +20,7 @@ case class KeepAliveServerPacketOld(var id: VarInt)
   def this(){this(VarInt(0))}
 }
 case class KeepAliveClientPacketOld(var id: VarInt)
-  extends Packet(PacketInfo(Map(335 -> 0x0B.toByte), direction = PacketDirection.Server)){
+  extends Packet(PacketInfo(Map(335 -> 0x0C.toByte), direction = PacketDirection.Server)){
 
   def this(){this(VarInt(0))}
 }

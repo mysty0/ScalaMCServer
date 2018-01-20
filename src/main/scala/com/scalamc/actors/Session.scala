@@ -4,11 +4,12 @@ import java.util.UUID.randomUUID
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.Tcp.Write
+import com.scalamc.actors.WorldsController.GetDefaultWorld
 
 import scala.concurrent.duration._
-import com.scalamc.models.world.Block
+import com.scalamc.models.world.{Block, World}
 import com.scalamc.models.world.chunk.Chunk
-import com.scalamc.models.{Player, Position, Server}
+import com.scalamc.models.{Location, Player, Position, Server}
 import com.scalamc.packets.game._
 import com.scalamc.packets.game.player.{PlayerLookPacket, PlayerPositionAndLookPacketClient, PlayerPositionAndLookPacketServer, PlayerPositionPacket}
 import com.scalamc.packets.login.{JoinGamePacket, LoginStartPacket, LoginSuccessPacket}
@@ -25,55 +26,41 @@ object Session{
 }
 
 class Session(connect: ActorRef, var name: String = "") extends Actor with ActorLogging {
-
+  val playersController = context.actorSelection("/user/playersController")
+  val worldController = context.actorSelection("/user/worldsController")
 
   override def receive = {
     case p: LoginStartPacket =>{
       name = p.name
-      println(name)
-      println(sender())
+      println("new player connect",name)
+      //println(sender())
       //println(ByteString(LoginSuccessPacket(randomUUID().toString, name).toArray))
-      println("uuid len", randomUUID().toString.length)
+      //println("uuid len", randomUUID().toString.length)
       connect ! LoginSuccessPacket(randomUUID().toString, name)
 
       connect ! JoinGamePacket()
 
       sender() ! ChangeState(ConnectionState.Playing)
 
-      var emptChunk = new Chunk(0, 0)
-//      emptChunk.setBlock(0, 2, 0, Block(22, 0))
-      //emptChunk.setBlock(0, 20, 0, Block(5, 0))
-      emptChunk.setBlock(0, 0, 0, Block(5, 0))
-      for(x <- 0 until 16)
-        for(z <- 0 until 16)
-          emptChunk.setBlock(x, 2, z, Block(1, 0))
+      worldController ! GetDefaultWorld
 
-      var packet = emptChunk.toPacket(true, true)
-      connect ! packet
-
-      connect ! BlockChangePacket(Position(0, 4, 0), Block(5, 0.toByte))
-
-      var emptChunk2 = new Chunk(1, 0)
-      emptChunk2.setBlock(0, 0, 0, Block(5, 0))
-      connect ! emptChunk2.toPacket(true, true)
-
-      connect ! BlockChangePacket(Position(0, 4, 0), Block(5, 0.toByte))
-//      for(x <- 0 until 16)
-//        for(z <- 0 until 16)
-//          connect ! Write(BlockChangePacket(Position(x, 2, z), Block(5, 0.toByte)))
-
-      //connect ! Write(SpawnPositionPacket())
-
-      connect ! PlayerPositionAndLookPacketClient(0.0, 10.0)
+      //connect ! PlayerPositionAndLookPacketClient(0.0, 10.0)
 
       Server.players += Player(name, this)
 
-      context.system.scheduler.scheduleOnce(50 milliseconds) {
+      context.system.scheduler.schedule(0 millisecond,30 second) {
         connect ! KeepAliveClientPacket(System.currentTimeMillis())
       }
     }
+
+    case world: World =>
+      connect ! PlayerPositionAndLookPacketClient(0.0, 10.0)
+      world.getChunksForDistance(Location(0,0,0), 3).foreach(ch => connect ! ch.toPacket(true, true))
+
+
     case p: KeepAliveClientPacket =>
       //connect ! Write(KeepAliveServerPacket(p.id))
+      //println("recive keep alive")
 
     case p: PlayerPositionAndLookPacketServer =>
       println("pos and look ", p.x, p.y, p.z, p.yaw, p.pitch)

@@ -1,6 +1,7 @@
 package com.scalamc.packets
 
 import java.io.File
+import java.util.UUID
 
 import akka.util.ByteString
 import com.scalamc.models.{VarInt, VarLong}
@@ -147,7 +148,7 @@ abstract class Packet(val packetInfo: PacketInfo) {
 
     var id = packetInfo.ids(protocolId)
     buff += (if(id==0xFF.toByte) packetInfo.ids(-1) else id)
-    if(id==0xFF.toByte) println(packetInfo.ids)
+    //if(id==0xFF.toByte) println(packetInfo.ids)
 //    val accessors = rm.classSymbol(this.getClass).toType.members.collect {
 //      case m: MethodSymbol if m.isGetter && m.isPublic => m
 //    }.toList.reverse
@@ -171,6 +172,9 @@ abstract class Packet(val packetInfo: PacketInfo) {
         case buf: ByteBuffer =>
           buff.writeVarInt(buf.size)
           buff += buf.toArray
+        case uuid: UUID =>
+          buff += uuid.getMostSignificantBits
+          buff += uuid.getLeastSignificantBits
       }
       //println(javax.xml.bind.DatatypeConverter.printHexBinary(buff.toArray))
     }

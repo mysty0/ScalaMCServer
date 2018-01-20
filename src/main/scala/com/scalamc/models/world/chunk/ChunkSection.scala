@@ -85,7 +85,7 @@ class ChunkSection(){
     }
     //println("set block id", t, "pall id", encoded)
     blocks(index(x, y, z)) = encoded
-    blocks.backing.foreach(l => print(l.toHexString+" "))
+    //blocks.backing.foreach(l => print(l.toHexString+" "))
     //println()
     //println("bpv", blocks.bitsPerValue)
   }

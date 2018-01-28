@@ -5,6 +5,7 @@ import java.util.Base64
 
 import akka.actor.{Actor, ActorRef}
 import akka.util.ByteString
+import com.scalamc.actors.ConnectionHandler.{ChangeState, Disconnect}
 import com.scalamc.objects.SessionManager
 import com.scalamc.packets.{Packet, PacketState}
 import com.scalamc.packets.login.LoginStartPacket
@@ -16,7 +17,13 @@ import scala.collection.mutable.ArrayBuffer
 object ConnectionState extends Enumeration{
   val Login, Playing = Value
 }
-case class ChangeState(state: ConnectionState.Value)
+
+object ConnectionHandler {
+
+  case class ChangeState(state: ConnectionState.Value)
+  case class Disconnect()
+
+}
 
 class ConnectionHandler extends Actor {
 
@@ -42,7 +49,10 @@ class ConnectionHandler extends Actor {
       println("chage state")
       state = cs.state
 
-    case PeerClosed => context stop self
+    case PeerClosed =>
+      if(session != null) session ! Disconnect()
+      println("disconnect handler", session, protocolId)
+      context stop self
   }
 
   private def parsePacket(packet: ByteBuffer)(implicit data: ByteString) = {

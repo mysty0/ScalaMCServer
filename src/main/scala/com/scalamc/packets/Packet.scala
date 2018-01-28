@@ -172,6 +172,8 @@ abstract class Packet(val packetInfo: PacketInfo) {
         case buf: ByteBuffer =>
           buff.writeVarInt(buf.size)
           buff += buf.toArray
+        case arr: Array[Byte] =>
+          buff += arr
         case uuid: UUID =>
           buff += uuid.getMostSignificantBits
           buff += uuid.getLeastSignificantBits

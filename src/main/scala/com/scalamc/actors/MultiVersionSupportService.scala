@@ -2,6 +2,7 @@ package com.scalamc.actors
 
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp.Write
+import com.scalamc.actors.ConnectionHandler.Disconnect
 import com.scalamc.models.VarInt
 import com.scalamc.packets.{Packet, PacketDirection}
 import com.scalamc.packets.game.{KeepAliveClientPacket, KeepAliveClientPacketOld, KeepAliveServerPacket, KeepAliveServerPacketOld}
@@ -23,6 +24,11 @@ class MultiVersionSupportService(client: ActorRef, connectionHandler: ActorRef, 
     case p: KeepAliveClientPacket if protocolId >= 339 => session ! p
     case p: KeepAliveClientPacketOld => client ! KeepAliveServerPacket(p.id.int.toLong)
 
+    case d: Disconnect =>
+      session ! Disconnect()
+      println("disconnect support service")
+      context stop self
+
     case p: Packet =>
       p.packetInfo.direction match{
         case PacketDirection.Client => client ! Write(p)
@@ -30,4 +36,5 @@ class MultiVersionSupportService(client: ActorRef, connectionHandler: ActorRef, 
       }
     case other => connectionHandler ! other
   }
+
 }

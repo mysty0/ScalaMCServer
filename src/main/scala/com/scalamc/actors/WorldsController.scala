@@ -1,8 +1,7 @@
 package com.scalamc.actors
 
-import akka.actor.{Actor, ActorLogging}
+import akka.actor.{Actor, ActorLogging, ActorRef}
 import com.scalamc.actors.WorldsController._
-import com.scalamc.models.world.World
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -12,11 +11,11 @@ object WorldsController{
 }
 
 class WorldsController  extends Actor with ActorLogging {
-  var worlds = ArrayBuffer[World](new World())
+  var worlds = ArrayBuffer[ActorRef](context.actorOf(World.props()))
 
   override def receive =  {
     case CreateNewWorld =>
-      worlds += new World()
+      worlds += context.actorOf(World.props())
 
     case GetDefaultWorld =>
       println("get world request")

@@ -1,6 +1,6 @@
 package com.scalamc.packets.status
 
-import com.scalamc.models.VarInt
+import com.scalamc.models.utils.VarInt
 import com.scalamc.packets.{Packet, PacketDirection, PacketInfo, PacketState}
 
 case class Handshake(var protocolVersion: VarInt = VarInt(0),

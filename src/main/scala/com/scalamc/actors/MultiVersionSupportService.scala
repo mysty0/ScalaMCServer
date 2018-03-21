@@ -3,7 +3,7 @@ package com.scalamc.actors
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp.Write
 import com.scalamc.actors.ConnectionHandler.Disconnect
-import com.scalamc.models.VarInt
+import com.scalamc.models.utils.VarInt
 import com.scalamc.packets.{Packet, PacketDirection}
 import com.scalamc.packets.game.{KeepAliveClientPacket, KeepAliveClientPacketOld, KeepAliveServerPacket, KeepAliveServerPacketOld}
 
@@ -26,6 +26,7 @@ class MultiVersionSupportService(client: ActorRef, connectionHandler: ActorRef, 
 
     case d: Disconnect =>
       session ! Disconnect()
+      client ! Disconnect()
       println("disconnect support service")
       context stop self
 

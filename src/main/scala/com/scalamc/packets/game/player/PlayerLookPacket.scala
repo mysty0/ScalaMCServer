@@ -1,6 +1,6 @@
 package com.scalamc.packets.game.player
 
-import com.scalamc.models.VarInt
+import com.scalamc.models.utils.VarInt
 import com.scalamc.packets.{Packet, PacketDirection, PacketInfo}
 
 class PlayerLookPacket (var yaw: Float = 0.0f,

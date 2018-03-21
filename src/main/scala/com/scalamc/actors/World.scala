@@ -2,7 +2,7 @@ package com.scalamc.actors
 
 import akka.actor.{Actor, ActorRef, Props}
 import com.scalamc.actors.World.GetChunksForDistance
-import com.scalamc.models.Events.JoinPlayerEvent
+import com.scalamc.models.Events.{ChangePosition, JoinPlayerEvent}
 import com.scalamc.models.{Location, Player}
 import com.scalamc.models.world.chunk.generators.FlatChunkGenerator
 import com.scalamc.models.world.chunk.{Chunk, ChunkGenerator}
@@ -52,7 +52,11 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
       //chunks += getChunk(0,0)
       println(chunks.length)
       sender() ! chunks
-    case JoinPlayerEvent(p) => players += p
+    case JoinPlayerEvent(p) =>
+      players += p
+
+    case ChangePosition(loc) =>
+      //players.foreach(_.session ! )
   }
 
 

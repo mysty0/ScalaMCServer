@@ -2,7 +2,7 @@ package com.scalamc.packets.game.player
 
 import java.util.UUID
 
-import com.scalamc.models.VarInt
+import com.scalamc.models.utils.VarInt
 import com.scalamc.packets.{Packet, PacketDirection, PacketInfo}
 
 class SpawnPlayer(var id: VarInt = VarInt(0),

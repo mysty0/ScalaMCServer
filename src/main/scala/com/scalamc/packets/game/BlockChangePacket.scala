@@ -1,7 +1,8 @@
 package com.scalamc.packets.game
 
 import com.scalamc.models.world.Block
-import com.scalamc.models.{Position, VarInt}
+import com.scalamc.models.Position
+import com.scalamc.models.utils.VarInt
 import com.scalamc.packets.{Packet, PacketDirection, PacketInfo}
 
 case class BlockChangePacket(var location: Position = Position(),

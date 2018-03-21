@@ -9,21 +9,19 @@ import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
 object CServer {
-  def props(port: Int) =
-    Props(new CServer(port))
+  def props(ip: String, port: Int) =
+    Props(new CServer(ip, port))
 }
 
-class CServer(port:Int) extends Actor with ActorLogging {
+class CServer(ip: String, port:Int) extends Actor with ActorLogging {
 
   override def preStart() {
-    log.info("Starting tcp net server")
+    log.info("Starting tcp net server on "+ip+":"+port.toString)
 
     import context.system
     val opts = List(SO.KeepAlive(on = true), SO.TcpNoDelay(on = true))
-    IO(Tcp) ! Bind(self, new InetSocketAddress("192.168.1.143", port), options = opts)
+    IO(Tcp) ! Bind(self, new InetSocketAddress(ip, port), options = opts)
   }
-
-  //IO(Tcp) ! Bind(self, new InetSocketAddress("localhost", port))
 
   def receive = {
     case b @ Bound(localAddress) =>

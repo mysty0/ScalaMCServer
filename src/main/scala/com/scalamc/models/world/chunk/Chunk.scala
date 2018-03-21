@@ -3,7 +3,7 @@ package com.scalamc.models.world.chunk
 import java.util
 import java.util.{HashSet, Set}
 
-import com.scalamc.models.VarInt
+import com.scalamc.models.utils.VarInt
 import com.scalamc.models.world.Block
 import com.scalamc.packets.game.ChunkPacket
 import com.scalamc.utils.ByteBuffer

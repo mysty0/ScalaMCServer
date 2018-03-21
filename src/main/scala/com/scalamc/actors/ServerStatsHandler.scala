@@ -6,6 +6,7 @@ import akka.util.ByteString
 import com.scalamc.objects.ServerStats
 import com.scalamc.packets.status.{Handshake, StatusPacket}
 import com.scalamc.utils.ByteBuffer
+import io.circe.Printer
 import io.circe.generic.auto._
 import io.circe.syntax._
 
@@ -17,8 +18,8 @@ class ServerStatsHandler extends Actor{
 
   override def receive = {
     case SendStat(s, protocol) => {
-      val stats = ServerStats.getStatusWithProtocolId(protocol).asJson.noSpaces
-      implicit val protocolId = -1
+      val stats = Printer.noSpaces.copy(dropNullKeys = true).pretty(ServerStats.getStatusWithProtocolId(protocol).asJson)
+      implicit val protocolId = protocol
       s ! Write(StatusPacket(stats))
 
     }

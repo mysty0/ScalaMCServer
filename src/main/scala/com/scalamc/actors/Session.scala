@@ -15,7 +15,6 @@ import com.scalamc.models._
 import com.scalamc.packets.game._
 import com.scalamc.packets.game.player.{PlayerLookPacket, PlayerPositionAndLookPacketClient, PlayerPositionAndLookPacketServer, PlayerPositionPacket}
 import com.scalamc.packets.login.{JoinGamePacket, LoginStartPacket, LoginSuccessPacket}
-import Chat
 import io.circe.Printer
 import io.circe.generic.auto._
 import io.circe.syntax._

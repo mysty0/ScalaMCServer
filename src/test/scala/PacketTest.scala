@@ -5,7 +5,6 @@ import com.scalamc.models.enums.Dimension.{DimensionVal, Overworld}
 import com.scalamc.models.enums.GameMode.{Creative, GameModeVal}
 import com.scalamc.models.enums.LevelType.{Default, LevelTypeVal}
 import com.scalamc.objects.ServerStats
-import com.scalamc.packets.game.playerslist.{AddPlayerAction, PlayerListPacket}
 import com.scalamc.packets.{Packet, PacketInfo}
 import com.scalamc.packets.login.{JoinGamePacket, LoginStartPacket, LoginSuccessPacket}
 import org.scalatest.{FeatureSpec, FunSuite, GivenWhenThen, Matchers}
@@ -13,6 +12,7 @@ import com.scalamc.utils.{ByteBuffer, PacketStack}
 import com.scalamc.utils.BytesUtils._
 import org.clapper.classutil.ClassInfo
 import com.scalamc.models.utils.VarInt._
+import com.scalamc.packets.game.player.SpawnPlayerPacket
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -128,10 +128,10 @@ class PacketTest extends FunSuite with GivenWhenThen with Matchers {
     assert(packet == comp)
   }
 
-  test("WritePacketWithBoolProperty"){
+  test("WriteSpawnPacket"){
 
     implicit val protocolId = 340
-    println(PlayerListPacket(1, 1, ArrayBuffer(AddPlayerAction())).write())
+    println(javax.xml.bind.DatatypeConverter.printHexBinary(SpawnPlayerPacket().write().toArray))
   }
 
 }

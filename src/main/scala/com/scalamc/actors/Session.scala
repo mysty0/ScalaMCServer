@@ -12,8 +12,9 @@ import scala.concurrent.duration._
 import com.scalamc.models.world.Block
 import com.scalamc.models.world.chunk.Chunk
 import com.scalamc.models._
+import com.scalamc.models.utils.VarInt
 import com.scalamc.packets.game._
-import com.scalamc.packets.game.player.{PlayerLookPacket, PlayerPositionAndLookPacketClient, PlayerPositionAndLookPacketServer, PlayerPositionPacket}
+import com.scalamc.packets.game.player._
 import com.scalamc.packets.login.{JoinGamePacket, LoginStartPacket, LoginSuccessPacket}
 import io.circe.Printer
 import io.circe.generic.auto._
@@ -22,6 +23,7 @@ import io.circe.syntax._
 import scala.concurrent._
 import ExecutionContext.Implicits.global
 import scala.collection.mutable.ArrayBuffer
+import scala.util.Random
 
 
 
@@ -39,7 +41,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
   override def receive = {
     case p: LoginStartPacket =>{
 
-      var pl = Player(p.name, randomUUID(), this)
+      var pl = Player(p.name, randomUUID(), this, Location(0, 65, 0))
       if(Players.players.contains(pl)){
         self ! com.scalamc.models.Events.Disconnect(Chat("You already playing on this server"))
       }
@@ -60,12 +62,19 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       sender() ! ChangeState(ConnectionState.Playing)
 
       world ! GetChunksForDistance(Location(0,0,0), 3)
-      connect ! PlayerPositionAndLookPacketClient(0.0, 10.0)
+      
+      connect ! PlayerPositionAndLookPacketClient(0.0, 65.0)
+      pl.teleport(pl.position)
+//filter(_!=pl).
+      Players.players.foreach(pla =>{
+        var actions = ArrayBuffer[PlayerItem]()
+        actions += PlayerItem(uuid = pla.uuid, action = AddPlayerListAction(name = pla.name))
+        connect ! PlayerListItemPacket(actions = actions)
+        connect ! SpawnPlayerPacket(VarInt(123), pla.uuid, pla.position.x, pla.position.y, pla.position.z, pla.position.yaw.toByte, pla.position.pitch.toByte)
+      })
 
-
-
-      context.system.scheduler.schedule(0 millisecond,1 second) {
-        connect ! KeepAliveClientPacket(System.currentTimeMillis())
+      context.system.scheduler.schedule(0 millisecond,10 second) {
+        connect ! TimeUpdate(0,9999);//KeepAliveClientPacket(System.currentTimeMillis())
       }
     }
 
@@ -74,10 +83,9 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
 //      world ! GetChunksForDistance(Location(0,0,0), 3)
 //      this.world = world
 
-    case chunks: ArrayBuffer[Chunk] =>
-      println("send chunks")
-      chunks.foreach(ch => connect ! ch.toPacket(true, true))
-      //connect ! PlayerPositionAndLookPacketClient(0.0, 10.0)
+    case chunk: Chunk =>
+      connect ! chunk.toPacket(true, true)
+
 
     case p: KeepAliveClientPacket =>
       //connect ! Write(KeepAliveServerPacket(p.id))

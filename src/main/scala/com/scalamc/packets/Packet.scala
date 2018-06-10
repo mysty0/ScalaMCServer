@@ -7,6 +7,7 @@ import akka.util.ByteString
 import com.scalamc.models.utils.VarLong
 import com.scalamc.models.enums.PacketEnum
 import com.scalamc.models.enums.PacketEnum.EnumVal
+import com.scalamc.models.metadata.{EntityMetadata, EntityMetadataRaw}
 import com.scalamc.models.utils.{VarInt, VarLong}
 import com.scalamc.utils.{ByteBuffer, ByteStack, ClassFieldsCache}
 import com.scalamc.utils.BytesUtils._
@@ -116,15 +117,13 @@ abstract class Packet(val packetInfo: PacketInfo) {
     }
   }
 
-
-
   def write()(implicit protocolId: Int): ByteBuffer ={
     var buff: ByteBuffer = new ByteBuffer()
 
     var id = packetInfo.ids(protocolId)
     buff += (if(id==0xFF.toByte) packetInfo.ids(-1) else id)
 
-    buff += writeFields(fields, instanceMirror).toArray
+    buff += writeFields(fields, instanceMirror, isMetadata = false).toArray
 
     var lenBuff = new ByteBuffer()
     lenBuff.writeVarInt(buff.length)
@@ -132,45 +131,63 @@ abstract class Packet(val packetInfo: PacketInfo) {
     lenBuff+buff.toArray
   }
 
-  def writeFields(fields: List[(Any, scala.reflect.runtime.universe.TermSymbol)], im: InstanceMirror ): ByteBuffer={
+  def writeFieldValue(buff: ByteBuffer, ind: Int, value: Any, isMetadata: Boolean): Unit ={
+    value match {
+      case str: String =>
+        if(isMetadata) buff.writeVarInt(3)
+        buff += str
+      case option: Option[Any] => if(option.isEmpty) buff += 0x00.toByte else writeFieldValue(buff, ind, option.get, isMetadata)
+      case int: Int =>
+        buff += int
+      case varInt: VarInt =>
+        if(isMetadata) buff.writeVarInt(1)
+        buff.writeVarInt(varInt.int)
+      case enum: EnumVal => buff += enum.toBytes
+      case bool: Boolean =>
+        if(isMetadata) buff.writeVarInt(6)
+        buff += (if(bool) 1.toByte else 0.toByte)
+      case byte: Byte =>
+        if(isMetadata) buff.writeVarInt(0)
+        buff += byte
+      case pos: com.scalamc.models.Position => buff += pos.toLong
+      case long: VarLong =>
+      case long: Long => buff += long
+      case double: Double => buff += double
+      case float: Float =>
+        if(isMetadata) buff.writeVarInt(2)
+        buff += float
+      case buf: ByteBuffer =>
+        buff.writeVarInt(buf.size)
+        buff += buf.toArray
+      case arr: Array[Byte] =>
+        buff += arr
+      case uuid: UUID =>
+        buff += uuid.getMostSignificantBits
+        buff += uuid.getLeastSignificantBits
+      case arBuf: ArrayBuffer[Any] =>
+        buff.writeVarInt(arBuf.size)
+        arBuf.foreach(el => buff += writeFields(ClassFieldsCache.getFields(el), rm.reflect(el), isMetadata = false).toArray)
+      case other =>
+        buff += writeFields(ClassFieldsCache.getFields(other), rm.reflect(other), other.getClass == classOf[EntityMetadataRaw]).toArray
+    }
+  }
+
+  def writeField(buff: ByteBuffer, ind: Int, t: Any, acc: scala.reflect.runtime.universe.TermSymbol, im: InstanceMirror, isMetadata: Boolean): Unit ={
+    if(isMetadata) buff += ind.toByte
+    writeFieldValue(buff, ind, im.reflectField(acc).get, isMetadata)
+
+  }
+
+  def writeFields(fields: List[(Any, scala.reflect.runtime.universe.TermSymbol)], im: InstanceMirror, isMetadata: Boolean): ByteBuffer={
     var buff: ByteBuffer = new ByteBuffer()
 
-    for((t, acc) <- fields){
-      im.reflectField(acc).get match {
-        case str: String =>
-          //println(acc)
-
-          //println(acc.annotations)
-
-          //if(acc.annotations.contains(new BoolProperty()))
-
-          buff += str
-        case int: Int => buff += int
-        case varInt: VarInt => buff.writeVarInt(varInt.int)
-        case enum: EnumVal => buff += enum.toBytes
-        case bool: Boolean => buff += (if(bool) 1.toByte else 0.toByte)
-        case byte: Byte => buff += byte
-        case pos: com.scalamc.models.Position => buff += pos.toLong
-        case long: VarLong =>
-        case long: Long => buff += long
-        case double: Double => buff += double
-        case float: Float => buff += float
-        case buf: ByteBuffer =>
-          buff.writeVarInt(buf.size)
-          buff += buf.toArray
-        case arr: Array[Byte] =>
-          buff += arr
-        case uuid: UUID =>
-          buff += uuid.getMostSignificantBits
-          buff += uuid.getLeastSignificantBits
-        case arBuf: ArrayBuffer[Any] =>
-          buff.writeVarInt(arBuf.size)
-          arBuf.foreach(el => buff += writeFields(ClassFieldsCache.getFields(el), rm.reflect(el)).toArray)
-        case other =>
-          buff += writeFields(ClassFieldsCache.getFields(other), rm.reflect(other)).toArray
-      }
+    //if(isMetadata) buff.writeVarInt(fields.size)
+    for(((t, acc), ind) <- fields.zipWithIndex){
+      writeField(buff, ind, t, acc, im, isMetadata)
       //println(javax.xml.bind.DatatypeConverter.printHexBinary(buff.toArray))
     }
+
+    if(isMetadata) buff += 0xFF.toByte
 
     buff
   }

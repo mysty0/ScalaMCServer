@@ -14,6 +14,7 @@ case class ServerStats(version: ServerVersion = ServerVersion("1.12.2", 340),
 }
 object ServerStats{
   val serverStats = ServerStats()
+  def getStatus(implicit protocolId: Int) = getStatusWithProtocolId(protocolId)
   def getStatusWithProtocolId(protocol: Int) = ServerStats(ServerVersion("1.12.2", protocol))
 }
 

@@ -1,42 +1,57 @@
 package com.scalamc.actors
 
-import akka.actor.{Actor, ActorRef}
-import akka.util.ByteString
-import com.scalamc.actors.ConnectionHandler.{ChangeState, Disconnect}
+import akka.actor._
+import akka.util.{ByteString, Timeout}
+import akka.pattern.ask
+import akka.util.Timeout
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.duration._
+import scala.language.postfixOps
+import scala.concurrent.ExecutionContext.Implicits.global
+
+import com.scalamc.actors.ConnectionHandler.{ChangeState, Disconnect, HandleLogin}
 import com.scalamc.packets.{Packet, PacketState}
 import com.scalamc.packets.status.Handshake
 import com.scalamc.utils._
 
 object ConnectionState extends Enumeration{
-  val Login, Playing = Value
+  val Login, Playing, Status = Value
+
+  implicit def connState2PacketState(connState: ConnectionState.Value): PacketState.Value = connState match{
+    case Login => PacketState.Login
+    case Status => PacketState.Status
+    case Playing => PacketState.Playing
+  }
 }
 
 object ConnectionHandler {
   case class ChangeState(state: ConnectionState.Value)
+  case class HandleLogin(protocolId: Int)
   case class Disconnect()
 }
 
 class ConnectionHandler extends Actor {
   import akka.io.Tcp._
 
-  val statsService = context.actorSelection("/user/stats")
+  implicit val timeout = Timeout(5 seconds)
+
+  lazy val statsService = context.actorOf(ServerStatsHandler.props(sender()))
 
   var session: ActorRef = _
 
-  var state: ConnectionState.Value = ConnectionState.Login
+  var state: ConnectionState.Value = ConnectionState.Status
 
   implicit var protocolId = 0
 
   def receive = {
-    case Received(data) => {
+    case Received(data) =>
       implicit val dataForParser = data
-      println("packet ", javax.xml.bind.DatatypeConverter.printHexBinary(data.toArray))
       val stack = new PacketStack(data.toArray)
       stack.handlePackets(parsePacket)
 
-    }
+
     case cs: ChangeState =>
-      println("chage state")
+      println("chage state", protocolId)
       state = cs.state
 
     case PeerClosed =>
@@ -46,23 +61,22 @@ class ConnectionHandler extends Actor {
   }
 
   private def parsePacket(packet: ByteBuffer)(implicit data: ByteString) = {
+    println("packet ", javax.xml.bind.DatatypeConverter.printHexBinary(data.toArray))
     val packetId = packet(0)
-    if (session != null) {
+    println("state", state)
+    if (state == ConnectionState.Login || state == ConnectionState.Playing) {
       println("packet id", packetId)
-      session ! Packet.fromByteBuffer(packet, if (state == ConnectionState.Login) PacketState.Login else PacketState.Playing)
+      session ! Packet.fromByteBuffer(packet, state)
     } else {
-      println("packet ", javax.xml.bind.DatatypeConverter.printHexBinary(packet.toArray))
-
-      if (packetId == 0 && packet.length>1) {
-        val pack = Packet.fromByteBuffer(packet, PacketState.Status).asInstanceOf[Handshake]
-        protocolId = pack.protocolVersion.int
-        if (pack.nextState.int == 1)
-          statsService ! SendStat(sender(), protocolId)
-        if (pack.nextState.int == 2)
+      var future = statsService ? Packet.fromByteBuffer(packet, state)
+      Await.result(future, timeout.duration) match{
+        case HandleLogin(protId) =>
+          protocolId = protId
+          state = ConnectionState.Login
+          println(state)
           session = context.actorOf(MultiVersionSupportService.props(sender(), self, protocolId))
+        case other =>
       }
-      if (packetId == 1 && packet.length > 1)
-        sender() ! Write(data)
     }
   }
 

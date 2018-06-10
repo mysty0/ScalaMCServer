@@ -36,8 +36,6 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
 
   override def receive = {
     case GetChunksForDistance(location, distance) =>
-      var chunks = ArrayBuffer[Chunk]()
-
       val pos = location.toPosition
 
       val centralX = pos.x >> 4
@@ -47,11 +45,9 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
 
       for(x <- centralX - distance to centralZ+distance)
         for(z <- centralZ - distance to centralZ + distance){
-          chunks += getChunk(x, z)
+          sender() ! getChunk(x, z)
         }
-      //chunks += getChunk(0,0)
-      println(chunks.length)
-      sender() ! chunks
+
     case JoinPlayerEvent(p) =>
       players += p
 

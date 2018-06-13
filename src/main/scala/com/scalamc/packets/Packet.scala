@@ -156,6 +156,8 @@ abstract class Packet(val packetInfo: PacketInfo) {
       case float: Float =>
         if(isMetadata) buff.writeVarInt(2)
         buff += float
+      case short: Short =>
+        buff += short
       case buf: ByteBuffer =>
         buff.writeVarInt(buf.size)
         buff += buf.toArray
@@ -166,7 +168,12 @@ abstract class Packet(val packetInfo: PacketInfo) {
         buff += uuid.getLeastSignificantBits
       case arBuf: ArrayBuffer[Any] =>
         buff.writeVarInt(arBuf.size)
-        arBuf.foreach(el => buff += writeFields(ClassFieldsCache.getFields(el), rm.reflect(el), isMetadata = false).toArray)
+        if(arBuf.nonEmpty) {
+          if(rm.reflect(arBuf(0)).symbol.annotations.exists(_.tree.tpe.typeSymbol == typeOf[NotParsable].typeSymbol))
+            arBuf.foreach(el => writeFieldValue(buff, ind, el, isMetadata = false))
+          else
+            arBuf.foreach(el => buff += writeFields(ClassFieldsCache.getFields(el), rm.reflect(el), isMetadata = false).toArray)
+        }
       case other =>
         buff += writeFields(ClassFieldsCache.getFields(other), rm.reflect(other), other.getClass == classOf[EntityMetadataRaw]).toArray
     }

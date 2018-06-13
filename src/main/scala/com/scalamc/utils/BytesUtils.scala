@@ -8,11 +8,13 @@ object BytesUtils {
 
   implicit def long2Bytes(long: Long): Array[Byte] = {
     var b = new Array[Byte](8)
-    for(i <- 0 until b.length){
+    for(i <- b.indices){
       b(i) = (long >> (b.length - i - 1 << 3)).toByte
     }
     b
   }
+
+  implicit def short2Bytes(short: Short): Array[Byte] = Array[Byte](((short >> 8) & 0xff).asInstanceOf[Byte], (short & 0xff).asInstanceOf[Byte])
 
   implicit def doubleToBytes(double: Double): Array[Byte] = {
     val l: Long = java.lang.Double.doubleToRawLongBits(double)
@@ -21,7 +23,7 @@ object BytesUtils {
 
   implicit def floatToBytes(float: Float): Array[Byte] = {
     val bits = java.lang.Float.floatToIntBits(float)
-    Array[Byte]((bits & 0xff).toByte, ((bits >> 8) & 0xff).toByte, ((bits >> 16) & 0xff).toByte, ((bits >> 24) & 0xff).toByte)
+    Array[Byte](((bits >> 24) & 0xff).toByte, ((bits >> 16) & 0xff).toByte, ((bits >> 8) & 0xff).toByte, (bits & 0xff).toByte)
   }
 
   implicit def string2Bytes(str: String): Array[Byte] = {

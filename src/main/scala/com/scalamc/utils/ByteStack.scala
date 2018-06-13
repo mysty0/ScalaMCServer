@@ -37,5 +37,5 @@ class ByteStack extends mutable.ArrayStack[Byte]() {
     }
     java.lang.Double.longBitsToDouble(res)
   }
-  def popFloat(): Float = java.lang.Float.intBitsToFloat((pop() & 0xFF) | ((pop() & 0xFF) << 8) | ((pop() & 0xFF) << 16) | ((pop() & 0xFF) << 24))
+  def popFloat(): Float = java.lang.Float.intBitsToFloat(((pop() & 0xFF) << 24) | ((pop() & 0xFF) << 16) | ((pop() & 0xFF) << 8) | (pop() & 0xFF))//java.lang.Float.intBitsToFloat((pop() & 0xFF) | ((pop() & 0xFF) << 8) | ((pop() & 0xFF) << 16) | ((pop() & 0xFF) << 24))
 }

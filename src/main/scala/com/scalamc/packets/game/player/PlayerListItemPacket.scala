@@ -31,3 +31,5 @@ case class AddPlayerListActionProperty(var name: String = "",
                                        var signature: Option[String] = None){
   def this(){this("")}
 }
+
+case class RemovePlayerListAction() extends PlayerListAction

@@ -33,19 +33,19 @@ object ConnectionHandler {
 class ConnectionHandler extends Actor {
   import akka.io.Tcp._
 
-  implicit val timeout = Timeout(5 seconds)
+  implicit val timeout: Timeout = Timeout(5 seconds)
 
-  lazy val statsService = context.actorOf(ServerStatsHandler.props(sender()))
+  lazy val statsService: ActorRef = context.actorOf(ServerStatsHandler.props(sender()))
 
   var session: ActorRef = _
 
   var state: ConnectionState.Value = ConnectionState.Status
 
-  implicit var protocolId = 0
+  implicit var protocolId: Int = 0
 
   def receive = {
     case Received(data) =>
-      implicit val dataForParser = data
+      implicit val dataForParser: ByteString = data
       val stack = new PacketStack(data.toArray)
       stack.handlePackets(parsePacket)
 
@@ -60,7 +60,7 @@ class ConnectionHandler extends Actor {
       context stop self
   }
 
-  private def parsePacket(packet: ByteBuffer)(implicit data: ByteString) = {
+  private def parsePacket(packet: ByteBuffer)(implicit data: ByteString): Unit = {
     println("packet ", javax.xml.bind.DatatypeConverter.printHexBinary(data.toArray))
     val packetId = packet(0)
     println("state", state)
@@ -68,7 +68,7 @@ class ConnectionHandler extends Actor {
       println("packet id", packetId)
       session ! Packet.fromByteBuffer(packet, state)
     } else {
-      var future = statsService ? Packet.fromByteBuffer(packet, state)
+      val future = statsService ? Packet.fromByteBuffer(packet, state)
       Await.result(future, timeout.duration) match{
         case HandleLogin(protId) =>
           protocolId = protId

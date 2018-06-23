@@ -5,8 +5,8 @@ import java.util.UUID.randomUUID
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.Tcp.Write
 import com.scalamc.actors.ConnectionHandler.{ChangeState, Disconnect}
+import com.scalamc.actors.Session._
 import com.scalamc.actors.World.GetChunksForDistance
-import com.scalamc.models.Events._
 
 import scala.concurrent.duration._
 import com.scalamc.models.world.Block
@@ -33,6 +33,14 @@ object Session{
   def props(connect: ActorRef) = Props(
     new Session(connect)
   )
+
+  case class DisconnectSession(reason: Chat)
+  case class DisconnectPlayer(player: Player)
+  case class AddNewPlayer(player: Player)
+  case class RelativeMove(entityId: Int, x: Short, y: Short, z: Short)
+  case class RelativeMoveAndLook(entityId: Int, x: Short, y: Short, z: Short, yaw: Byte, pitch: Byte)
+  case class RelativeLook(entityId: Int, yaw: Byte, pitch: Byte)
+  case class TeleportEntity(entityId: Int, location: Location)
 }
 
 class Session(connect: ActorRef) extends Actor with ActorLogging {
@@ -46,17 +54,18 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
     var actions = ArrayBuffer[PlayerItem]()
     actions += PlayerItem(uuid = pl.uuid, action = AddPlayerListAction(name = pl.name))
     connect ! PlayerListItemPacket(actions = actions)
-    connect ! SpawnPlayerPacket(VarInt(pl.entityId), pl.uuid, pl.position.x, pl.position.y, pl.position.z, pl.position.yaw.toByte, pl.position.pitch.toByte)
+    connect ! SpawnPlayerPacket(VarInt(pl.entityId), pl.uuid, pl.location.x, pl.location.y, pl.location.z, pl.location.yaw.toByte, pl.location.pitch.toByte)
 
+    println("add new player")
   }
 
   override def receive = {
     case p: LoginStartPacket =>{
 
       player = Player(p.name, (Players.players.size+100)*10, randomUUID(), this, Location(0, 65, 0))
-      if(Players.players.contains(player)){
-        self ! com.scalamc.models.Events.Disconnect(player, Chat("You already playing on this server"))
-      }
+//      if(Players.players.contains(player)){
+//        self ! DisconnectSession(Chat("You already playing on this server"))
+//      }
 
 
       Players.players += player
@@ -73,16 +82,16 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
 
       sender() ! ChangeState(ConnectionState.Playing)
 
-      world ! GetChunksForDistance(Location(0,0,0), 3)
+      world ! World.GetChunksForDistance(Location(0,0,0), 3)
       
       connect ! PlayerPositionAndLookPacketClient(0.0, 65.0)
-      player.teleport(player.position)
 //filter(_!=pl).
-      world ! JoinPlayerEvent(player)
+      world ! World.JoinPlayer(player)
+      //player.spawn(world.asInstanceOf[World])
 
       context.system.scheduler.schedule(0 millisecond,10 second) {
         connect ! TimeUpdate(0,9999);//KeepAliveClientPacket(System.currentTimeMillis())
-        world ! GetPlayersPosition(player)
+        //world ! GetPlayersPosition(player)
       }
     }
 
@@ -102,55 +111,48 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
     case p: PlayerPositionAndLookPacketServer =>
       println("pos and look ", p.x, p.y, p.z, p.yaw, p.pitch)
       //connect ! Write(PositionAndLookPacketClient(p.x, p.y, p.z, p.yaw+10, p.pitch+10))
-      world ! ChangePlayerPositionAndLook(player, Location(p.x, p.y, p.z, p.yaw, p.pitch), player.position)
+      world ! World.UpdateEntityPositionAndLook(player.entityId, Location(p.x, p.y, p.z, p.yaw, p.pitch))
     case p: PlayerPositionPacket =>
-      println("pos ", p.x, p.y, p.z)
      // connect ! Write(PositionAndLookPacketClient(p.x, p.y, p.z, 0, 0))
-      world ! ChangePlayerPosition(player, Location(p.x, p.y, p.z), player.position)
+      world ! World.UpdateEntityPosition(player.entityId, Location(p.x, p.y, p.z, player.location.yaw, player.location.pitch))
 
     case p: PlayerLookPacket =>
-      println("look ", p.yaw, p.pitch)
-      world ! ChagePlayerLook(player, p.yaw, p.pitch)
+      world ! World.UpdateEntityLook(player.entityId, Location(player.location.x, player.location.y, player.location.z, p.yaw, p.pitch))
     case p: ClientSettingsPacket =>
       println("setts", p)
     case p: TeleportConfirmPacket =>
 
-    case RelativePlayerMove(pl, x, y, z) =>
-      println("relmove", pl.name, player.name)
-      connect ! EntityRelativeMovePacket(pl.entityId, x, y, z)
-    case RelativePlayerMoveAndLook(pl, x, y, z, yaw, pitch) =>
-      println("relmove", pl.name, player.name)
-      connect ! EntityRelativeMoveAndLookPacket(pl.entityId, x, y, z, yaw, pitch)
+    case RelativeMove(id, x, y, z) =>
+      connect ! EntityRelativeMovePacket(id, x, y, z)
+    case RelativeMoveAndLook(id, x, y, z, yaw, pitch) =>
+      connect ! EntityRelativeMoveAndLookPacket(id, x, y, z, yaw, pitch)
       //connect ! EntityHeadRotationPacket(pl.entityId, yaw)
-
-    case ChangeEntityLook(id, yaw, pitch) =>
+    case RelativeLook(id, yaw, pitch) =>
       connect ! EntityLookPacket(id, yaw, pitch)
       //connect ! EntityHeadRotationPacket(id, yaw)
 
     case TeleportEntity(id, loc) =>
       connect ! EntityTeleportPacket(id, loc.x, loc.y, loc.z, Utils.angleToByte(loc.yaw), Utils.angleToByte(loc.pitch), false)
 
-    case JoinPlayerEvent(pl) =>
+    case AddNewPlayer(pl) =>
       addNewPlayer(pl)
 
-    case com.scalamc.models.Events.Disconnect(pl, reason) =>
-      if(pl.uuid == player.uuid) {
+    case DisconnectSession(reason) =>
         val printer = Printer.noSpaces.copy(dropNullKeys = true)
         self ! Disconnect()
         connect ! DisconnectPacket(printer.pretty(reason.asJson))
         connect ! Disconnect()
         context stop self
-      } else{
+    case DisconnectPlayer(pl) =>
         var actions = ArrayBuffer[PlayerItem]()
         actions += PlayerItem(uuid = pl.uuid, action = RemovePlayerListAction())
         connect ! PlayerListItemPacket(action = VarInt(4), actions = actions)
         var ids = new ArrayBuffer[VarInt]()
         ids += pl.entityId
         connect ! DestroyEntitiesPacket(ids)
-      }
 
     case d: Disconnect =>
-      world ! com.scalamc.models.Events.Disconnect(player, Chat())
+      world ! World.DisconnectPlayer(player, Chat())
       Players.players -= player
       println("disconnect session")
       context stop self

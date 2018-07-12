@@ -18,6 +18,8 @@ class ByteStack extends mutable.ArrayStack[Byte]() {
 
   def popShort(): Short = (((pop()&0xFF)<<8) | (pop()&0xFF)).toShort
 
+  def popUnsignedShort(): Int = ((0xFF & pop()) << 8) | (0xFF&pop())
+
   def popInt(): Int = (pop() << 24) + (pop() << 16) + (pop() << 8) + (pop() << 0)
 
   def popLong():Long = {

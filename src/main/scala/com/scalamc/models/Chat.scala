@@ -10,5 +10,4 @@ import io.circe.generic.JsonCodec
                 var obfuscated: Option[Boolean] = None,
                 var color: Option[String] = None,
                 var insertion: Option[String] = None) {
-
 }

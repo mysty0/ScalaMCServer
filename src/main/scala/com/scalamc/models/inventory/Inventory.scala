@@ -1,5 +1,6 @@
 package com.scalamc.models.inventory
 
-class Inventory {
+trait Inventory {
+  var items: Array[InventoryItem]
 
 }

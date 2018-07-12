@@ -30,6 +30,7 @@ object World{
   case class UpdateEntityPosition(entityId: Int, loc: Location)
   case class UpdateEntityPositionAndLook(entityId: Int, loc: Location)
   case class UpdateEntityLook(entityId: Int, loc: Location)
+  case class AnimateEntity(entityId: Int, animationId: Byte)
 }
 
 class World(chunkGenerator: ChunkGenerator) extends Actor{
@@ -110,8 +111,11 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
       players.foreach{pl =>
           pl.session.self ! Session.DisconnectPlayer(p)
       }
-    //case GetPlayersPosition(pl) =>
-     // players.filter(_.uuid != pl.uuid).foreach(p => pl.session.self ! TeleportEntity(p.entityId, p.location))
+
+    case AnimateEntity(eId, aId) =>
+      players.filter(_.entityId != eId).foreach {pl =>
+        pl.session.self ! Session.AnimationEntity(eId, aId)
+      }
 
     case UpdateEntityPosition(id, loc) =>
       val entity: Option[Entity] = entities.find(_.entityId == id)

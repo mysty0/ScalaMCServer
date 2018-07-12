@@ -1,6 +1,6 @@
 package com.scalamc.packets
 
-import java.io.File
+import java.io.{ByteArrayInputStream, DataOutput, DataOutputStream, File}
 import java.util.UUID
 
 import akka.util.ByteString
@@ -11,11 +11,12 @@ import com.scalamc.models.metadata.{EntityMetadata, EntityMetadataRaw}
 import com.scalamc.models.utils.{VarInt, VarLong}
 import com.scalamc.utils.{ByteBuffer, ByteStack, ClassFieldsCache}
 import com.scalamc.utils.BytesUtils._
+import com.xorinc.scalanbt.tags._
+import com.xorinc.scalanbt.io._
 import org.clapper.classutil.{ClassFinder, ClassInfo}
 
 import scala.util.Try
-import scala.reflect.runtime.universe
-import scala.reflect.runtime.{currentMirror => rm}
+import scala.reflect.runtime.{universe, currentMirror => rm}
 import org.reflections.Reflections
 
 import scala.annotation.ClassfileAnnotation
@@ -79,18 +80,23 @@ abstract class Packet(val packetInfo: PacketInfo) {
     implicit def :=(any: Any) = instanceMirror.reflectField(ts).set(any)
   }
 
-  implicit val instanceMirror = rm.reflect(this)
+  val instanceMirror: universe.InstanceMirror = rm.reflect(this)
 
   //Set default id
   packetInfo.ids = packetInfo.ids.withDefault(_ => 0xFF.toByte)
 
-  val fields = ClassFieldsCache.getFields(this)
-
+  //val fields: List[(Any, universe.TermSymbol)] =
 
   def read(byteBuffer: ByteBuffer): Unit ={
-    var stack = new ByteStack(byteBuffer.toArray)
+    val stack = new ByteStack(byteBuffer.toArray)
+    readFields(stack, this)
+  }
 
-    for((name, field) <- fields){
+  def readFields(stack: ByteStack, obj: Any): Unit ={
+    val classFields: List[(Any, universe.TermSymbol)] = ClassFieldsCache.getFields(obj)
+    implicit val instMirror: universe.InstanceMirror = rm.reflect(obj)
+
+    for((name, field) <- classFields){
       name match {
         case _: String =>
           val len = stack.popVarInt()
@@ -113,6 +119,12 @@ abstract class Packet(val packetInfo: PacketInfo) {
           field := stack.popShort()
         case _: Int =>
           field := stack.popInt()
+        case _: TagCompound =>
+          field := readNBT(new ByteArrayInputStream(stack.toArray))._2
+        case op: Option[Any] =>
+          if(stack.nonEmpty) readFields(stack, op.get)
+        case other =>
+          readFields(stack, other)
       }
     }
   }
@@ -123,7 +135,7 @@ abstract class Packet(val packetInfo: PacketInfo) {
     var id = packetInfo.ids(protocolId)
     buff += (if(id==0xFF.toByte) packetInfo.ids(-1) else id)
 
-    buff += writeFields(fields, instanceMirror, isMetadata = false).toArray
+    buff += writeFields(ClassFieldsCache.getFields(this), instanceMirror, isMetadata = false).toArray
 
     var lenBuff = new ByteBuffer()
     lenBuff.writeVarInt(buff.length)
@@ -174,6 +186,13 @@ abstract class Packet(val packetInfo: PacketInfo) {
           else
             arBuf.foreach(el => buff += writeFields(ClassFieldsCache.getFields(el), rm.reflect(el), isMetadata = false).toArray)
         }
+      case tag: TagCompound =>
+        import java.io.ByteArrayOutputStream
+        import java.io.DataOutput
+        val boas = new ByteArrayOutputStream()
+        val out = new DataOutputStream(boas)
+        writeNBT(out)("", tag)
+        buff += boas.toByteArray
       case other =>
         buff += writeFields(ClassFieldsCache.getFields(other), rm.reflect(other), other.getClass == classOf[EntityMetadataRaw]).toArray
     }

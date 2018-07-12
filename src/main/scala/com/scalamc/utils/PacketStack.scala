@@ -11,7 +11,6 @@ class PacketStack extends ByteStack {
   def handlePackets(parsePacketHandler: (ByteBuffer) => Unit) = {
     try {
       while (nonEmpty){
-        //println(javax.xml.bind.DatatypeConverter.printHexBinary(this.toArray))
         parsePacketHandler(popPacketWith(popPacketLength()))
       }
     } catch {

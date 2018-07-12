@@ -8,8 +8,6 @@ import scala.collection.mutable
 object ClassFieldsCache {
   var map = collection.mutable.Map[Any, List[(Any, scala.reflect.runtime.universe.TermSymbol)]]()
 
-
-
   def getFields(clas: Any): List[(Any, scala.reflect.runtime.universe.TermSymbol)]={
     val instanceMirror = rm.reflect(clas)
     map.getOrElse(clas,

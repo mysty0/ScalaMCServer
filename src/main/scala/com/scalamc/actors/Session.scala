@@ -2,7 +2,7 @@ package com.scalamc.actors
 
 import java.util.UUID.randomUUID
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Cancellable, Props}
 import akka.io.Tcp.Write
 import com.scalamc.actors.ConnectionHandler.{ChangeState, Disconnect}
 import com.scalamc.actors.Session._
@@ -16,6 +16,7 @@ import com.scalamc.models.utils.VarInt
 import com.scalamc.packets.game._
 import com.scalamc.packets.game.entity._
 import com.scalamc.packets.game.player._
+import com.scalamc.packets.game.player.inventory.CreativeInventoryActionPacket
 import com.scalamc.packets.login.{JoinGamePacket, LoginStartPacket, LoginSuccessPacket}
 import com.scalamc.utils.Utils
 import io.circe.Printer
@@ -41,22 +42,23 @@ object Session{
   case class RelativeMoveAndLook(entityId: Int, x: Short, y: Short, z: Short, yaw: Byte, pitch: Byte)
   case class RelativeLook(entityId: Int, yaw: Byte, pitch: Byte)
   case class TeleportEntity(entityId: Int, location: Location)
+  case class AnimationEntity(entityId: Int, animationId: Byte)
 }
 
 class Session(connect: ActorRef) extends Actor with ActorLogging {
 
-  val world = context.actorSelection("/user/defaultWorld")
-  val eventController = context.actorSelection("/user/eventController")
+  val world: ActorSelection = context.actorSelection("/user/defaultWorld")
+  val eventController: ActorSelection = context.actorSelection("/user/eventController")
 
   var player: Player = _
+
+  var timeUpdateSchedule: Cancellable = _
 
   def addNewPlayer(pl: Player): Unit ={
     var actions = ArrayBuffer[PlayerItem]()
     actions += PlayerItem(uuid = pl.uuid, action = AddPlayerListAction(name = pl.name))
     connect ! PlayerListItemPacket(actions = actions)
     connect ! SpawnPlayerPacket(VarInt(pl.entityId), pl.uuid, pl.location.x, pl.location.y, pl.location.z, pl.location.yaw.toByte, pl.location.pitch.toByte)
-
-    println("add new player")
   }
 
   override def receive = {
@@ -67,13 +69,10 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
 //        self ! DisconnectSession(Chat("You already playing on this server"))
 //      }
 
-
       Players.players += player
 
       println("new player connect",p.name, player.uuid, player.entityId)
-      //println(sender())
-      //println(ByteString(LoginSuccessPacket(randomUUID().toString, name).toArray))
-      //println("uuid len", randomUUID().toString.length)
+
       connect ! LoginSuccessPacket(player.uuid.toString, p.name)
 
       connect ! JoinGamePacket()
@@ -85,23 +84,17 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       world ! World.GetChunksForDistance(Location(0,0,0), 3)
       
       connect ! PlayerPositionAndLookPacketClient(0.0, 65.0)
-//filter(_!=pl).
-      world ! World.JoinPlayer(player)
-      //player.spawn(world.asInstanceOf[World])
 
-      context.system.scheduler.schedule(0 millisecond,10 second) {
+      world ! World.JoinPlayer(player)
+
+      timeUpdateSchedule = context.system.scheduler.schedule(0 millisecond,10 second) {
         connect ! TimeUpdate(0,9999);//KeepAliveClientPacket(System.currentTimeMillis())
         //world ! GetPlayersPosition(player)
       }
     }
 
-//    case world: ActorRef =>
-//      connect ! PlayerPositionAndLookPacketClient(0.0, 10.0)
-//      world ! GetChunksForDistance(Location(0,0,0), 3)
-//      this.world = world
-
     case chunk: Chunk =>
-      connect ! chunk.toPacket(true, true)
+      connect ! chunk.toPacket(skylight = true, entireChunk = true)
 
 
     case p: KeepAliveClientPacket =>
@@ -109,33 +102,40 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       println("recive keep alive",p.id)
 
     case p: PlayerPositionAndLookPacketServer =>
-      println("pos and look ", p.x, p.y, p.z, p.yaw, p.pitch)
-      //connect ! Write(PositionAndLookPacketClient(p.x, p.y, p.z, p.yaw+10, p.pitch+10))
       world ! World.UpdateEntityPositionAndLook(player.entityId, Location(p.x, p.y, p.z, p.yaw, p.pitch))
     case p: PlayerPositionPacket =>
-     // connect ! Write(PositionAndLookPacketClient(p.x, p.y, p.z, 0, 0))
       world ! World.UpdateEntityPosition(player.entityId, Location(p.x, p.y, p.z, player.location.yaw, player.location.pitch))
 
     case p: PlayerLookPacket =>
       world ! World.UpdateEntityLook(player.entityId, Location(player.location.x, player.location.y, player.location.z, p.yaw, p.pitch))
+
+    case AnimationPacketServer(hand) =>
+      world ! World.AnimateEntity(player.entityId, if(hand.int == 0) 0 else 3)
+    case AnimationEntity(eId, aId) =>
+      connect ! AnimationPacketClient(eId, aId)
+
     case p: ClientSettingsPacket =>
       println("setts", p)
+      player.settings = new PlayerSettings(p)
     case p: TeleportConfirmPacket =>
 
     case RelativeMove(id, x, y, z) =>
       connect ! EntityRelativeMovePacket(id, x, y, z)
     case RelativeMoveAndLook(id, x, y, z, yaw, pitch) =>
       connect ! EntityRelativeMoveAndLookPacket(id, x, y, z, yaw, pitch)
-      //connect ! EntityHeadRotationPacket(pl.entityId, yaw)
+      connect ! EntityHeadRotationPacket(id, yaw)
     case RelativeLook(id, yaw, pitch) =>
       connect ! EntityLookPacket(id, yaw, pitch)
-      //connect ! EntityHeadRotationPacket(id, yaw)
+      connect ! EntityHeadRotationPacket(id, yaw)
 
     case TeleportEntity(id, loc) =>
       connect ! EntityTeleportPacket(id, loc.x, loc.y, loc.z, Utils.angleToByte(loc.yaw), Utils.angleToByte(loc.pitch), false)
 
     case AddNewPlayer(pl) =>
       addNewPlayer(pl)
+
+    case action: CreativeInventoryActionPacket =>
+      println("click", action.item.nbt)
 
     case DisconnectSession(reason) =>
         val printer = Printer.noSpaces.copy(dropNullKeys = true)
@@ -154,7 +154,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
     case d: Disconnect =>
       world ! World.DisconnectPlayer(player, Chat())
       Players.players -= player
-      println("disconnect session")
+      timeUpdateSchedule.cancel()
       context stop self
   }
 

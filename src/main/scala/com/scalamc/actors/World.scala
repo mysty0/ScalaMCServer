@@ -1,10 +1,12 @@
 package com.scalamc.actors
 
+import java.util.UUID
+
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.scalamc.actors.Session.AddNewPlayer
 import com.scalamc.actors.World._
 import com.scalamc.models.entity.Entity
-import com.scalamc.models.{Chat, Location, Player}
+import com.scalamc.models.{Chat, Location, Player, Position}
 import com.scalamc.models.world.chunk.generators.FlatChunkGenerator
 import com.scalamc.models.world.chunk.{Chunk, ChunkGenerator}
 import com.scalamc.utils.Utils
@@ -21,6 +23,8 @@ object World{
   def props(chunkGenerator: ChunkGenerator = new FlatChunkGenerator()) = Props(
     new World(chunkGenerator)
   )
+
+  private val minChunkUpdateDistance = 10
 
   private val period = 100.millisecond
 
@@ -39,6 +43,7 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
   var chunks = new mutable.HashMap[Long,Chunk]()
   var entities: ArrayBuffer[Entity] = ArrayBuffer[Entity]()
   var players: ArrayBuffer[Player] = ArrayBuffer[Player]()
+  var playersLastChunkUpdateLocation: scala.collection.mutable.Map[UUID, Location] = scala.collection.mutable.Map()
   private var scheduler: Cancellable = _
 
   override def preStart(): Unit = {
@@ -56,8 +61,47 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
 
   def needTeleport(dx: Double, dy: Double, dz: Double): Boolean = dx > Short.MaxValue || dy > Short.MaxValue || dz > Short.MaxValue || dx < Short.MinValue || dy < Short.MinValue || dz < Short.MinValue
 
+  def getRendererRanges(position: Position, distance: Int): (Range, Range) ={
+    val centralX = position.x >> 4
+    val centralZ = position.z >> 4
+    (centralX - distance to centralX + distance, centralZ - distance to centralZ + distance)
+  }
+
+  def unloadChunk(x: Int, z: Int, player: Player): Unit ={
+    player.session.self ! Session.UnloadChunk(getChunk(x, z))
+  }
+
+  def loadChunk(x: Int, z: Int, player: Player): Unit ={
+    player.session.self ! Session.LoadChunk(getChunk(x, z))
+    println("load new chunk")
+  }
+
+  def updatePlayerChunks(player: Player): Unit ={
+    if(playersLastChunkUpdateLocation.contains(player.uuid)){
+      val lastLoc = playersLastChunkUpdateLocation(player.uuid)
+      if(lastLoc.distanceXZ(player.location) > minChunkUpdateDistance) {
+        val lastRanges = getRendererRanges(lastLoc.toPosition, player.settings.viewDistance/2)
+        val currRanges = getRendererRanges(player.location.toPosition, player.settings.viewDistance/2)
+
+        def applyToNonOverlapingChunks(firstRanges: (Range, Range), secondRanges: (Range, Range), action: (Int, Int)=>Unit): Unit ={
+          for(x <- firstRanges._1)
+            for(z <- firstRanges._2)
+              if(!(secondRanges._1.contains(x) && secondRanges._2.contains(z)))
+                action(x, z)
+        }
+
+        applyToNonOverlapingChunks(lastRanges, currRanges, (x, y) => unloadChunk(x, y, player))
+        applyToNonOverlapingChunks(currRanges, lastRanges, (x, y) => loadChunk(x, y, player))
+
+        playersLastChunkUpdateLocation(player.uuid) = player.location
+      }
+    } else
+      playersLastChunkUpdateLocation += (player.uuid -> player.location)
+  }
+
   override def receive = {
     case Tick =>
+      players.filter(_.hasMove).foreach(updatePlayerChunks)
       entities.filter(e => e.hasRotate || e.hasMove).foreach{ent =>
         if(ent.hasMove) {
           val relLoc = Utils.locationToRelativeLocation(ent.location, ent.previousLocation)
@@ -92,8 +136,10 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
       val centralZ = pos.z >> 4
       println("ceb x", centralX)
 
-      for(x <- centralX - distance to centralZ+distance)
-        for(z <- centralZ - distance to centralZ + distance){
+      val dist = distance/2
+
+      for(x <- centralX - dist to centralX+dist)
+        for(z <- centralZ - dist to centralZ + dist){
           sender() ! getChunk(x, z)
         }
 

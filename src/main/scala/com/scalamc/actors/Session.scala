@@ -12,11 +12,15 @@ import scala.concurrent.duration._
 import com.scalamc.models.world.Block
 import com.scalamc.models.world.chunk.Chunk
 import com.scalamc.models._
+import com.scalamc.models.enums.GameMode
+import com.scalamc.models.enums.GameMode.GameModeVal
+import com.scalamc.models.inventory.InventoryItem
 import com.scalamc.models.utils.VarInt
+import com.scalamc.packets.Packet
 import com.scalamc.packets.game._
 import com.scalamc.packets.game.entity._
 import com.scalamc.packets.game.player._
-import com.scalamc.packets.game.player.inventory.CreativeInventoryActionPacket
+import com.scalamc.packets.game.player.inventory.{ClickWindowPacket, CreativeInventoryActionPacket, SetSlotPacket, SlotRaw}
 import com.scalamc.packets.login.{JoinGamePacket, LoginStartPacket, LoginSuccessPacket}
 import com.scalamc.utils.Utils
 import io.circe.Printer
@@ -43,12 +47,16 @@ object Session{
   case class RelativeLook(entityId: Int, yaw: Byte, pitch: Byte)
   case class TeleportEntity(entityId: Int, location: Location)
   case class AnimationEntity(entityId: Int, animationId: Byte)
+  case class LoadChunk(chunk: Chunk)
+  case class UnloadChunk(chunk: Chunk)
 }
 
 class Session(connect: ActorRef) extends Actor with ActorLogging {
 
   val world: ActorSelection = context.actorSelection("/user/defaultWorld")
   val eventController: ActorSelection = context.actorSelection("/user/eventController")
+
+  val inventoryController: ActorRef = context.actorOf(InventoryController.props(self))
 
   var player: Player = _
 
@@ -75,17 +83,17 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
 
       connect ! LoginSuccessPacket(player.uuid.toString, p.name)
 
-      connect ! JoinGamePacket()
+      connect ! JoinGamePacket(0, GameMode.Creative)
 
       //connect ! PluginMessagePacketServer("MC|Brand", "name".getBytes("UTF-8"))
 
       sender() ! ChangeState(ConnectionState.Playing)
-
-      world ! World.GetChunksForDistance(Location(0,0,0), 3)
       
       connect ! PlayerPositionAndLookPacketClient(0.0, 65.0)
 
       world ! World.JoinPlayer(player)
+
+      inventoryController ! InventoryController.SetSlot(44, new InventoryItem(1, count = 2))
 
       timeUpdateSchedule = context.system.scheduler.schedule(0 millisecond,10 second) {
         connect ! TimeUpdate(0,9999);//KeepAliveClientPacket(System.currentTimeMillis())
@@ -96,6 +104,11 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
     case chunk: Chunk =>
       connect ! chunk.toPacket(skylight = true, entireChunk = true)
 
+    case LoadChunk(chunk) =>
+      connect ! chunk.toPacket(skylight = true, entireChunk = true)
+
+    case UnloadChunk(chunk) =>
+      connect ! UnloadChunkPacket(chunk.x, chunk.y)
 
     case p: KeepAliveClientPacket =>
       //connect ! Write(KeepAliveServerPacket(p.id))
@@ -117,6 +130,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
     case p: ClientSettingsPacket =>
       println("setts", p)
       player.settings = new PlayerSettings(p)
+      world ! World.GetChunksForDistance(player.location, player.settings.viewDistance)
     case p: TeleportConfirmPacket =>
 
     case RelativeMove(id, x, y, z) =>
@@ -135,7 +149,10 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       addNewPlayer(pl)
 
     case action: CreativeInventoryActionPacket =>
-      println("click", action.item.nbt)
+      inventoryController ! InventoryController.HandleInventoryPacket(action)
+
+    case click: ClickWindowPacket =>
+      inventoryController ! InventoryController.HandleInventoryPacket(click)
 
     case DisconnectSession(reason) =>
         val printer = Printer.noSpaces.copy(dropNullKeys = true)
@@ -156,6 +173,8 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       Players.players -= player
       timeUpdateSchedule.cancel()
       context stop self
+
+    case packet: Packet => connect ! packet
   }
 
 

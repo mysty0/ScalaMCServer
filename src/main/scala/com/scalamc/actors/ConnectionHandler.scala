@@ -62,10 +62,8 @@ class ConnectionHandler extends Actor {
 
   private def parsePacket(packet: ByteBuffer)(implicit data: ByteString): Unit = {
     println("packet ", javax.xml.bind.DatatypeConverter.printHexBinary(data.toArray))
-    val packetId = packet(0)
-    println("state", state)
     if (state == ConnectionState.Login || state == ConnectionState.Playing) {
-      println("packet id", packetId)
+      println("packet id", packet(0))
       session ! Packet.fromByteBuffer(packet, state)
     } else {
       val future = statsService ? Packet.fromByteBuffer(packet, state)

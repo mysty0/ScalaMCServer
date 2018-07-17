@@ -16,7 +16,7 @@ object Chunk{
   val SEC_COUNT = DEPTH / SEC_DEPTH
 }
 
-class Chunk(x: Int, y: Int) {
+class Chunk(var x: Int, var y: Int) {
 
   var sections = new Array[ChunkSection](16)
   var heightMap = Array[Byte]()

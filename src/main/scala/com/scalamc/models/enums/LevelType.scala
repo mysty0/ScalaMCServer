@@ -4,9 +4,7 @@ import com.scalamc.models.enums.PacketEnum.EnumVal
 import com.scalamc.utils.BytesUtils._
 
 object LevelType extends Enumeration {
-  case class LevelTypeVal(name: String) extends EnumVal{
-    override def toBytes: Array[Byte] = name
-  }
+  case class LevelTypeVal(override var value: Any) extends EnumVal
 
   val Default = LevelTypeVal("default")
   val Flat = LevelTypeVal("flat")

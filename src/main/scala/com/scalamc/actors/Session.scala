@@ -76,25 +76,15 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
 //      if(Players.players.contains(player)){
 //        self ! DisconnectSession(Chat("You already playing on this server"))
 //      }
-
-      Players.players += player
-
+      //Players.players += player
       println("new player connect",p.name, player.uuid, player.entityId)
-
       connect ! LoginSuccessPacket(player.uuid.toString, p.name)
-
-      connect ! JoinGamePacket(0, GameMode.Creative)
-
+      connect ! JoinGamePacket(0, GameMode.Survival)
       //connect ! PluginMessagePacketServer("MC|Brand", "name".getBytes("UTF-8"))
-
       sender() ! ChangeState(ConnectionState.Playing)
-      
       connect ! PlayerPositionAndLookPacketClient(0.0, 65.0)
-
       world ! World.JoinPlayer(player)
-
       inventoryController ! InventoryController.SetSlot(44, new InventoryItem(1, count = 2))
-
       timeUpdateSchedule = context.system.scheduler.schedule(0 millisecond,10 second) {
         connect ! TimeUpdate(0,9999);//KeepAliveClientPacket(System.currentTimeMillis())
         //world ! GetPlayersPosition(player)
@@ -153,6 +143,9 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
 
     case click: ClickWindowPacket =>
       inventoryController ! InventoryController.HandleInventoryPacket(click)
+
+    case p: PlayerDiggingPacket =>
+      println("player digging" +p.status)
 
     case DisconnectSession(reason) =>
         val printer = Printer.noSpaces.copy(dropNullKeys = true)

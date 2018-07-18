@@ -4,9 +4,7 @@ import com.scalamc.models.enums.PacketEnum.EnumVal
 import com.scalamc.utils.BytesUtils._
 
 object Dimension extends Enumeration {
-  case class DimensionVal(dmId: Int) extends EnumVal{
-    override def toBytes: Array[Byte] = dmId
-  }
+  case class DimensionVal(override var value: Any) extends EnumVal
 
   val Nether = DimensionVal(-1)
   val Overworld = DimensionVal(0)

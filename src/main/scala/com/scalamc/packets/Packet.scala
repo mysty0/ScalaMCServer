@@ -4,11 +4,13 @@ import java.io.{ByteArrayInputStream, DataOutput, DataOutputStream, File}
 import java.util.UUID
 
 import akka.util.ByteString
+import com.scalamc.models.Position
 import com.scalamc.models.utils.VarLong
 import com.scalamc.models.enums.PacketEnum
 import com.scalamc.models.enums.PacketEnum.EnumVal
 import com.scalamc.models.metadata.{EntityMetadata, EntityMetadataRaw}
 import com.scalamc.models.utils.{VarInt, VarLong}
+import com.scalamc.packets.game.player.DiggingStatus
 import com.scalamc.utils.{ByteBuffer, ByteStack, ClassFieldsCache}
 import com.scalamc.utils.BytesUtils._
 import com.xorinc.scalanbt.tags._
@@ -90,6 +92,7 @@ abstract class Packet(val packetInfo: PacketInfo) {
   def read(byteBuffer: ByteBuffer): Unit ={
     val stack = new ByteStack(byteBuffer.toArray)
     readFields(stack, this)
+    println("read end ",javax.xml.bind.DatatypeConverter.printHexBinary(stack.toArray))
   }
 
   def readFields(stack: ByteStack, obj: Any): Unit ={
@@ -97,35 +100,52 @@ abstract class Packet(val packetInfo: PacketInfo) {
     implicit val instMirror: universe.InstanceMirror = rm.reflect(obj)
 
     for((name, field) <- classFields){
-      name match {
-        case _: String =>
-          val len = stack.popVarInt()
-          field := ByteString(stack.popWith(len).toArray).decodeString("utf-8")
-        case _: VarInt =>
-          field := VarInt(stack.popVarInt())
-        case _: Double =>
-          field := stack.popDouble()
-        case _: Float =>
-          field := stack.popFloat()
-        case _: Boolean =>
-          field := (if (stack.pop()==0) false else true)
-        case _: Long =>
-          field := stack.popLong()
-        case _: Byte =>
-          field := stack.pop()
-        case _: Array[Byte] =>
-          field := stack.popWith(stack.popVarInt()).toArray
-        case _: Short =>
-          field := stack.popShort()
-        case _: Int =>
-          field := stack.popInt()
-        case _: TagCompound =>
-          field := readNBT(new ByteArrayInputStream(stack.toArray))._2
-        case op: Option[Any] =>
-          if(stack.nonEmpty) readFields(stack, op.get)
-        case other =>
-          readFields(stack, other)
-      }
+      readField(stack, name, field)
+    }
+  }
+
+  def readField(stack: ByteStack, name: Any, field: universe.TermSymbol)(implicit instMirror: universe.InstanceMirror): Unit ={
+    name match {
+      case _: String =>
+        val len = stack.popVarInt()
+        field := ByteString(stack.popWith(len).toArray).decodeString("utf-8")
+      case _: VarInt =>
+        field := VarInt(stack.popVarInt())
+      case _: Double =>
+        field := stack.popDouble()
+      case _: Float =>
+        field := stack.popFloat()
+      case _: Boolean =>
+        field := (if (stack.pop()==0) false else true)
+      case _: Long =>
+        field := stack.popLong()
+      case _: Byte =>
+        field := stack.pop()
+      case _: Array[Byte] =>
+        field := stack.popWith(stack.popVarInt()).toArray
+      case _: Short =>
+        field := stack.popShort()
+      case _: Int =>
+        field := stack.popInt()
+      case _: com.scalamc.models.Position =>
+        val value = stack.popLong()
+        val x = value >> 38
+        // signed
+        val y = value >> 26 & 0xfff
+        // unsigned
+        // this shifting madness is used to preserve sign
+        val z = value << 38 >> 38
+        field := com.scalamc.models.Position(x.toInt, y.toInt, z.toInt)
+//      case e: EnumVal =>
+//        field := e(stack.pop())
+      //  println("read enum")
+      //  readField(stack, e.value, rm.reflect(e.value).symbol.asTerm)
+      case _: TagCompound =>
+        field := readNBT(new ByteArrayInputStream(stack.toArray))._2
+      case op: Option[Any] =>
+        if(stack.nonEmpty) readFields(stack, op.get)
+      case other =>
+        readFields(stack, other)
     }
   }
 
@@ -154,7 +174,8 @@ abstract class Packet(val packetInfo: PacketInfo) {
       case varInt: VarInt =>
         if(isMetadata) buff.writeVarInt(1)
         buff.writeVarInt(varInt.int)
-      case enum: EnumVal => buff += enum.toBytes
+      case enum: EnumVal =>
+        writeFieldValue(buff, ind, enum.value, isMetadata = false)
       case bool: Boolean =>
         if(isMetadata) buff.writeVarInt(6)
         buff += (if(bool) 1.toByte else 0.toByte)

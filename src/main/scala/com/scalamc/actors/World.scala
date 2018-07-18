@@ -73,7 +73,6 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
 
   def loadChunk(x: Int, z: Int, player: Player): Unit ={
     player.session.self ! Session.LoadChunk(getChunk(x, z))
-    println("load new chunk")
   }
 
   def updatePlayerChunks(player: Player): Unit ={

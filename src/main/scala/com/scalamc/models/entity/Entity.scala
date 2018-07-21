@@ -10,4 +10,8 @@ trait Entity {
   val entityId: Int
   var location: Location
   var previousLocation:Location
+
+  val typeId: Int
+  val boundingBox: BoundingBox
+  val nameId: String
 }

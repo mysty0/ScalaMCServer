@@ -14,4 +14,6 @@ object ScalaMC extends App{
  // val statsActor = actorSystem.actorOf(Props[ServerStatsHandler], "stats")
   val eventController = actorSystem.actorOf(Props[EventController], "eventController")
   val worldsController = actorSystem.actorOf(World.props(), "defaultWorld")
+  val chatHandler = actorSystem.actorOf(ChatHandler.props(), "chatHandler")
+  val commandHandler = actorSystem.actorOf(CommandHandler.props(), "commandHandler")
 }

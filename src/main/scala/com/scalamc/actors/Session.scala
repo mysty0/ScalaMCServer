@@ -54,6 +54,7 @@ object Session{
 class Session(connect: ActorRef) extends Actor with ActorLogging {
 
   val world: ActorSelection = context.actorSelection("/user/defaultWorld")
+  val chatHandler: ActorSelection = context.actorSelection("/user/chatHandler")
   val eventController: ActorSelection = context.actorSelection("/user/eventController")
 
   val inventoryController: ActorRef = context.actorOf(InventoryController.props(self))
@@ -79,7 +80,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       //Players.players += player
       println("new player connect",p.name, player.uuid, player.entityId)
       connect ! LoginSuccessPacket(player.uuid.toString, p.name)
-      connect ! JoinGamePacket(0, GameMode.Survival)
+      connect ! JoinGamePacket(0, GameMode.Creative)
       //connect ! PluginMessagePacketServer("MC|Brand", "name".getBytes("UTF-8"))
       sender() ! ChangeState(ConnectionState.Playing)
       connect ! PlayerPositionAndLookPacketClient(0.0, 65.0)
@@ -90,7 +91,6 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
         //world ! GetPlayersPosition(player)
       }
     }
-
     case chunk: Chunk =>
       connect ! chunk.toPacket(skylight = true, entireChunk = true)
 
@@ -100,6 +100,10 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
     case UnloadChunk(chunk) =>
       connect ! UnloadChunkPacket(chunk.x, chunk.y)
 
+    case ChatMessagePacket(msg)=>
+      chatHandler ! ChatHandler.NewMessage(msg, player)
+    case TabCompletePacket(command, assumeCommand, blockPosition) =>
+      chatHandler ! ChatHandler.TabCompleteRequest(command, assumeCommand, player)
     case p: KeepAliveClientPacket =>
       //connect ! Write(KeepAliveServerPacket(p.id))
       println("recive keep alive",p.id)

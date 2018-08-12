@@ -4,6 +4,8 @@ import java.util.UUID.randomUUID
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Cancellable, Props}
 import akka.io.Tcp.Write
+import akka.util.Timeout
+import com.scalamc.ScalaMC
 import com.scalamc.actors.ConnectionHandler.{ChangeState, Disconnect}
 import com.scalamc.actors.Session._
 import com.scalamc.actors.World.GetChunksForDistance
@@ -31,8 +33,6 @@ import scala.concurrent._
 import ExecutionContext.Implicits.global
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
-
-
 
 object Session{
   def props(connect: ActorRef) = Props(
@@ -73,7 +73,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
   override def receive = {
     case p: LoginStartPacket =>{
 
-      player = Player(p.name, (Players.players.size+100)*10, randomUUID(), this, Location(0, 65, 0))
+      player = Player(p.name, (Players.players.size+100)*10, randomUUID(), this.self, ScalaMC.worldController, Location(0, 65, 0))
 //      if(Players.players.contains(player)){
 //        self ! DisconnectSession(Chat("You already playing on this server"))
 //      }
@@ -102,7 +102,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
 
     case ChatMessagePacket(msg)=>
       chatHandler ! ChatHandler.NewMessage(msg, player)
-    case TabCompletePacket(command, assumeCommand, blockPosition) =>
+    case TabCompleteRequestPacket(command, assumeCommand, blockPosition) =>
       chatHandler ! ChatHandler.TabCompleteRequest(command, assumeCommand, player)
     case p: KeepAliveClientPacket =>
       //connect ! Write(KeepAliveServerPacket(p.id))

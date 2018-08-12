@@ -9,6 +9,7 @@ import com.scalamc.models.entity.Entity
 import com.scalamc.models.{Chat, Location, Player, Position}
 import com.scalamc.models.world.chunk.generators.FlatChunkGenerator
 import com.scalamc.models.world.chunk.{Chunk, ChunkGenerator}
+import com.scalamc.packets.Packet
 import com.scalamc.utils.Utils
 
 import scala.collection.mutable
@@ -28,17 +29,20 @@ object World{
 
   private val period = 100.millisecond
 
-  case object  Tick
+  case object Tick
   case class JoinPlayer(player: Player)
   case class DisconnectPlayer(player: Player, reason: Chat)
   case class UpdateEntityPosition(entityId: Int, loc: Location)
   case class UpdateEntityPositionAndLook(entityId: Int, loc: Location)
   case class UpdateEntityLook(entityId: Int, loc: Location)
   case class AnimateEntity(entityId: Int, animationId: Byte)
+  case class SendPacketToAllPlayers(packet: Packet)
 }
 
 class World(chunkGenerator: ChunkGenerator) extends Actor{
   import context._
+
+  val entityController: ActorRef = context.actorOf(EntityController.props(this.self), "entityController")
 
   var chunks = new mutable.HashMap[Long,Chunk]()
   var entities: ArrayBuffer[Entity] = ArrayBuffer[Entity]()
@@ -68,11 +72,11 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
   }
 
   def unloadChunk(x: Int, z: Int, player: Player): Unit ={
-    player.session.self ! Session.UnloadChunk(getChunk(x, z))
+    player.session ! Session.UnloadChunk(getChunk(x, z))
   }
 
   def loadChunk(x: Int, z: Int, player: Player): Unit ={
-    player.session.self ! Session.LoadChunk(getChunk(x, z))
+    player.session ! Session.LoadChunk(getChunk(x, z))
   }
 
   def updatePlayerChunks(player: Player): Unit ={
@@ -99,6 +103,8 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
   }
 
   override def receive = {
+    case SendPacketToAllPlayers(p) => players.foreach(_.session ! p)
+
     case Tick =>
       players.filter(_.hasMove).foreach(updatePlayerChunks)
       entities.filter(e => e.hasRotate || e.hasMove).foreach{ent =>
@@ -108,11 +114,11 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
             val angYaw = Utils.angleToByte(ent.location.yaw)
             val angPitch = Utils.angleToByte(ent.location.pitch)
             players.filter(_.entityId != ent.entityId ).foreach {pl =>
-                pl.session.self ! Session.RelativeMoveAndLook(ent.entityId, relLoc.x.toShort, relLoc.y.toShort, relLoc.z.toShort, angYaw, angPitch)
+                pl.session ! Session.RelativeMoveAndLook(ent.entityId, relLoc.x.toShort, relLoc.y.toShort, relLoc.z.toShort, angYaw, angPitch)
             }
           }else{
             players.filter(_.entityId != ent.entityId ).foreach {pl =>
-                pl.session.self ! Session.RelativeMove(ent.entityId, relLoc.x.toShort, relLoc.y.toShort, relLoc.z.toShort)
+                pl.session ! Session.RelativeMove(ent.entityId, relLoc.x.toShort, relLoc.y.toShort, relLoc.z.toShort)
             }
           }
         }
@@ -120,7 +126,7 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
           val angYaw = Utils.angleToByte(ent.location.yaw)
           val angPitch = Utils.angleToByte(ent.location.pitch)
           players.filter(_.entityId != ent.entityId ).foreach {pl =>
-              pl.session.self ! Session.RelativeLook(ent.entityId, angYaw, angPitch)
+              pl.session ! Session.RelativeLook(ent.entityId, angYaw, angPitch)
           }
         }
         ent.hasRotate = false
@@ -144,8 +150,8 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
 
     case JoinPlayer(p) =>
       players.foreach{pl =>
-          pl.session.self ! Session.AddNewPlayer(p)
-          p.session.self ! Session.AddNewPlayer(pl)
+          pl.session ! Session.AddNewPlayer(p)
+          p.session ! Session.AddNewPlayer(pl)
       }
       entities += p
       players += p
@@ -154,12 +160,12 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
       entities -= p
       players -= p
       players.foreach{pl =>
-          pl.session.self ! Session.DisconnectPlayer(p)
+          pl.session ! Session.DisconnectPlayer(p)
       }
 
     case AnimateEntity(eId, aId) =>
       players.filter(_.entityId != eId).foreach {pl =>
-        pl.session.self ! Session.AnimationEntity(eId, aId)
+        pl.session ! Session.AnimationEntity(eId, aId)
       }
 
     case UpdateEntityPosition(id, loc) =>
@@ -171,8 +177,8 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
         ent.hasMove = true
 //        val needTp = needTeleport(relLoc.x, relLoc.y, relLoc.z)
 //        entities.flatMap{case pl: Player if pl.entityId != id => Some(pl)}.foreach(p => {
-//          if (!needTp) p.session.self ! Session.RelativeMove(id, relLoc.x.toShort, relLoc.y.toShort, relLoc.z.toShort)
-//          else p.session.self ! Session.TeleportEntity(id, loc)
+//          if (!needTp) p.session ! Session.RelativeMove(id, relLoc.x.toShort, relLoc.y.toShort, relLoc.z.toShort)
+//          else p.session ! Session.TeleportEntity(id, loc)
 //        })
         }
     case UpdateEntityPositionAndLook(id, loc) =>
@@ -187,8 +193,8 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
         ent.hasMove = true
 //        val needTp = needTeleport(relLoc.x, relLoc.y, relLoc.z)
 //        entities.flatMap{case pl: Player if pl.entityId != id => Some(pl)}.foreach(p => {
-//          if (!needTp) p.session.self ! Session.RelativeMoveAndLook(id, relLoc.x.toShort, relLoc.y.toShort, relLoc.z.toShort, angYaw, angPitch)
-//          else p.session.self ! Session.TeleportEntity(id, loc)
+//          if (!needTp) p.session ! Session.RelativeMoveAndLook(id, relLoc.x.toShort, relLoc.y.toShort, relLoc.z.toShort, angYaw, angPitch)
+//          else p.session ! Session.TeleportEntity(id, loc)
 //        })
       }
     case UpdateEntityLook(id, loc) =>
@@ -199,7 +205,7 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
         val ent = entity.get
         ent.location = loc
         ent.hasRotate = true
-        //players.filter(_.uuid != pl.uuid).foreach(_.session.self ! ChangeEntityLook(pl.entityId, angYaw, angPitch))
+        //players.filter(_.uuid != pl.uuid).foreach(_.session ! ChangeEntityLook(pl.entityId, angYaw, angPitch))
       }
   }
 

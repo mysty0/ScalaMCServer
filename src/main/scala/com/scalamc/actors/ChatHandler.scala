@@ -22,8 +22,8 @@ class ChatHandler extends Actor{
     case NewMessage(msg, sender) =>
       println(s"${sender.name} send: $msg")
       if(msg.head == commandChar)
-        commandHandler ! CommandHandler.CommandExecute(msg, sender)
+        commandHandler ! CommandsHandler.CommandExecute(msg, sender)
     case TabCompleteRequest(text, isCommand, sender) =>
-      commandHandler ! CommandHandler.CommandCompleteRequest(text, sender)
+      commandHandler ! CommandsHandler.CommandCompleteRequest(text, sender)
   }
 }

@@ -16,4 +16,7 @@ object ScalaMC extends App{
   val worldController = actorSystem.actorOf(World.props(), "defaultWorld")
   val chatHandler = actorSystem.actorOf(ChatHandler.props(), "chatHandler")
   val commandHandler = actorSystem.actorOf(CommandsHandler.props(), "commandHandler")
+
+  val pluginController = actorSystem.actorOf(PluginController.props(), "pluginController")
+  pluginController ! PluginController.LoadPluginsFromDir("plugins")
 }

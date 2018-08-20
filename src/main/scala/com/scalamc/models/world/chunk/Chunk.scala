@@ -3,6 +3,7 @@ package com.scalamc.models.world.chunk
 import java.util
 import java.util.{HashSet, Set}
 
+import com.scalamc.models.Position
 import com.scalamc.models.utils.VarInt
 import com.scalamc.models.world.Block
 import com.scalamc.packets.game.ChunkPacket
@@ -25,7 +26,7 @@ class Chunk(var x: Int, var y: Int) {
   def getSection(y: Int): ChunkSection ={
     sections(y/Chunk.SEC_DEPTH)
   }
-
+  def setBlock(position: Position, block: Block): Unit = setBlock(position.x, position.y, position.z, block)
   def setBlock(x: Int, y: Int, z: Int, block: Block): Unit ={
     var sec = getSection(y)
     if(sec == null){
@@ -36,7 +37,7 @@ class Chunk(var x: Int, var y: Int) {
 
     sec.setBlock(x, y, z, block)
   }
-
+  def getBlock(position: Position): Block = getBlock(position.x, position.y, position.z)
   def getBlock(x: Int, y: Int, z: Int): Block ={
     val section = getSection(y)
     if (section == null) Block(0,0)

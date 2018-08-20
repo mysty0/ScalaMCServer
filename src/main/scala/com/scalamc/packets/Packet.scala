@@ -136,8 +136,11 @@ abstract class Packet(val packetInfo: PacketInfo) {
         // this shifting madness is used to preserve sign
         val z = value << 38 >> 38
         field := com.scalamc.models.Position(x.toInt, y.toInt, z.toInt)
-//      case e: EnumVal =>
-//        field := e(stack.pop())
+
+
+        //println(e.enum.values.find(v => v.id == stack.pop().toInt))
+        //println(e.enum.values.mkString)
+        //field := e.getClass.getConstructors()(0).newInstance(stack.pop())
       //  println("read enum")
       //  readField(stack, e.value, rm.reflect(e.value).symbol.asTerm)
       case _: TagCompound =>

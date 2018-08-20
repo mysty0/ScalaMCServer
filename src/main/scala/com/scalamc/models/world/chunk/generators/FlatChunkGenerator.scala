@@ -8,7 +8,7 @@ class FlatChunkGenerator extends ChunkGenerator{
     val chunk = new Chunk(x, z)
     for(xx <- 0 until 16)
       for(zz <- 0 until 16)
-        chunk.setBlock(xx, 60, zz, Block(1, 0))
+        chunk.setBlock(xx, 60, zz, Block(2, 0))
     chunk
   }
 }

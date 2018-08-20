@@ -6,10 +6,15 @@ import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.scalamc.actors.Session.AddNewPlayer
 import com.scalamc.actors.World._
 import com.scalamc.models.entity.Entity
+import com.scalamc.models.enums.BlockFace.BlockFaceVal
+import com.scalamc.models.enums.DiggingStatus
+import com.scalamc.models.enums.DiggingStatus.DiggingStatusVal
+import com.scalamc.models.world.Block
 import com.scalamc.models.{Chat, Location, Player, Position}
 import com.scalamc.models.world.chunk.generators.FlatChunkGenerator
 import com.scalamc.models.world.chunk.{Chunk, ChunkGenerator}
 import com.scalamc.packets.Packet
+import com.scalamc.packets.game.BlockChangePacket
 import com.scalamc.utils.Utils
 
 import scala.collection.mutable
@@ -37,6 +42,15 @@ object World{
   case class UpdateEntityLook(entityId: Int, loc: Location)
   case class AnimateEntity(entityId: Int, animationId: Byte)
   case class SendPacketToAllPlayers(packet: Packet)
+
+  case class SetBlock(position: Position, block: Block)
+
+  case class PlayerDigging(player: Player, diggingStatus: DiggingStatusVal, blockPosition: Position, blockFace: BlockFaceVal)
+  case class PlayerPlaceBlock(player: Player, position: Position,
+                              face: BlockFaceVal,
+                              hand: Byte, cursorX: Float,
+                              cursorY: Float,
+                              cursorZ: Float)
 }
 
 class World(chunkGenerator: ChunkGenerator) extends Actor{
@@ -86,15 +100,15 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
         val lastRanges = getRendererRanges(lastLoc.toPosition, player.settings.viewDistance/2)
         val currRanges = getRendererRanges(player.location.toPosition, player.settings.viewDistance/2)
 
-        def applyToNonOverlapingChunks(firstRanges: (Range, Range), secondRanges: (Range, Range), action: (Int, Int)=>Unit): Unit ={
+        def applyToNonOverlappingChunks(firstRanges: (Range, Range), secondRanges: (Range, Range), action: (Int, Int)=>Unit): Unit ={
           for(x <- firstRanges._1)
             for(z <- firstRanges._2)
               if(!(secondRanges._1.contains(x) && secondRanges._2.contains(z)))
                 action(x, z)
         }
 
-        applyToNonOverlapingChunks(lastRanges, currRanges, (x, y) => unloadChunk(x, y, player))
-        applyToNonOverlapingChunks(currRanges, lastRanges, (x, y) => loadChunk(x, y, player))
+        applyToNonOverlappingChunks(lastRanges, currRanges, (x, y) => unloadChunk(x, y, player))
+        applyToNonOverlappingChunks(currRanges, lastRanges, (x, y) => loadChunk(x, y, player))
 
         playersLastChunkUpdateLocation(player.uuid) = player.location
       }
@@ -105,9 +119,14 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
   override def receive = {
     case SendPacketToAllPlayers(p) => players.foreach(_.session ! p)
 
+    case SetBlock(pos, block) =>
+      getChunk(pos.x >> 4, pos.z >> 4).setBlock(pos.toChunkRelativePosition, block)
+      println("set block at "+pos)
+      self ! SendPacketToAllPlayers(BlockChangePacket(pos, block))
+
     case Tick =>
       players.filter(_.hasMove).foreach(updatePlayerChunks)
-      entities.filter(e => e.hasRotate || e.hasMove).foreach{ent =>
+      players.filter(e => e.hasRotate || e.hasMove).foreach{ent =>
         if(ent.hasMove) {
           val relLoc = Utils.locationToRelativeLocation(ent.location, ent.previousLocation)
           if (ent.hasRotate) {
@@ -167,6 +186,15 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
       players.filter(_.entityId != eId).foreach {pl =>
         pl.session ! Session.AnimationEntity(eId, aId)
       }
+
+    case PlayerDigging(player, status, pos, face) =>
+      if(status == DiggingStatus.FinishedDigging) getChunk(pos.x >> 4, pos.z >> 4).setBlock(pos.toChunkRelativePosition, Block(0,0))
+      players.filter(_.entityId != player.entityId).foreach {pl => pl.session ! BlockChangePacket(pos, Block(0,0))}
+
+    case PlayerPlaceBlock(player, pos, face, hand, cX, cY, cZ) =>
+      val block = Block(player.inventory.items(36+player.selectedSlot).id, 0)
+      getChunk(pos.x >> 4, pos.z >> 4).setBlock((pos+face.posMod).toChunkRelativePosition, block)//player.inventory.items(player.selectedSlot).id
+      players.filter(_.entityId != player.entityId).foreach {pl => pl.session ! BlockChangePacket(pos+face.posMod, block)}
 
     case UpdateEntityPosition(id, loc) =>
       val entity: Option[Entity] = entities.find(_.entityId == id)

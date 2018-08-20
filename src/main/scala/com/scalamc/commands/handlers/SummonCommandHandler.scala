@@ -14,7 +14,7 @@ class SummonCommandHandler extends Actor{
 
   override def receive: Receive = {
     case CommandHandlerEvents.HandleCommand(sender, command, args) =>
-      if(args.length > 1)
+      if(args.length > 1 && command == "summon")
         getEntityController(sender.world) ! EntityController.SummonMobById(args(1), sender.location)
   }
 }

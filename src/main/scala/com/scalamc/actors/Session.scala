@@ -2,8 +2,8 @@ package com.scalamc.actors
 
 import java.util.UUID.randomUUID
 
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Cancellable, Props}
-import akka.io.Tcp.Write
+import akka.actor._
+import akka.pattern.ask
 import akka.util.Timeout
 import com.scalamc.ScalaMC
 import com.scalamc.actors.ConnectionHandler.{ChangeState, Disconnect}
@@ -14,7 +14,8 @@ import scala.concurrent.duration._
 import com.scalamc.models.world.Block
 import com.scalamc.models.world.chunk.Chunk
 import com.scalamc.models._
-import com.scalamc.models.enums.GameMode
+import com.scalamc.models.enums.BlockFace.BlockFaceVal
+import com.scalamc.models.enums.{BlockFace, DiggingStatus, GameMode}
 import com.scalamc.models.enums.GameMode.GameModeVal
 import com.scalamc.models.inventory.InventoryItem
 import com.scalamc.models.utils.VarInt
@@ -63,6 +64,8 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
 
   var timeUpdateSchedule: Cancellable = _
 
+  implicit val timeout: Timeout = Timeout(5 seconds)
+
   def addNewPlayer(pl: Player): Unit ={
     var actions = ArrayBuffer[PlayerItem]()
     actions += PlayerItem(uuid = pl.uuid, action = AddPlayerListAction(name = pl.name))
@@ -70,27 +73,34 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
     connect ! SpawnPlayerPacket(VarInt(pl.entityId), pl.uuid, pl.location.x, pl.location.y, pl.location.z, pl.location.yaw.toByte, pl.location.pitch.toByte)
   }
 
-  override def receive = {
-    case p: LoginStartPacket =>{
 
-      player = Player(p.name, (Players.players.size+100)*10, randomUUID(), this.self, ScalaMC.worldController, Location(0, 65, 0))
-//      if(Players.players.contains(player)){
-//        self ! DisconnectSession(Chat("You already playing on this server"))
-//      }
-      //Players.players += player
-      println("new player connect",p.name, player.uuid, player.entityId)
-      connect ! LoginSuccessPacket(player.uuid.toString, p.name)
-      connect ! JoinGamePacket(0, GameMode.Creative)
-      //connect ! PluginMessagePacketServer("MC|Brand", "name".getBytes("UTF-8"))
-      sender() ! ChangeState(ConnectionState.Playing)
-      connect ! PlayerPositionAndLookPacketClient(0.0, 65.0)
-      world ! World.JoinPlayer(player)
-      inventoryController ! InventoryController.SetSlot(44, new InventoryItem(1, count = 2))
-      timeUpdateSchedule = context.system.scheduler.schedule(0 millisecond,10 second) {
-        connect ! TimeUpdate(0,9999);//KeepAliveClientPacket(System.currentTimeMillis())
-        //world ! GetPlayersPosition(player)
+  override def receive: PartialFunction[Any, Unit] = {
+    case p: LoginStartPacket =>
+      val future = ScalaMC.entityIdManager ? EntityIdManager.GetId
+      Await.result(future, timeout.duration) match{
+        case id: Int =>
+          player = Player(p.name, id, randomUUID(), this.self, ScalaMC.worldController, Location(0, 65, 0))
+          //      if(Players.players.contains(player)){
+          //        self ! DisconnectSession(Chat("You already playing on this server"))
+          //      }
+          //Players.players += player
+          println("new player connect",p.name, player.uuid, player.entityId)
+          connect ! LoginSuccessPacket(player.uuid.toString, p.name)
+          connect ! JoinGamePacket(0, GameMode.Survival)
+          //connect ! PluginMessagePacketServer("MC|Brand", "name".getBytes("UTF-8"))
+          sender() ! ChangeState(ConnectionState.Playing)
+          connect ! PlayerPositionAndLookPacketClient(0.0, 65.0)
+          world ! World.JoinPlayer(player)
+          inventoryController ! InventoryController.SetSlot(44, new InventoryItem(1, count = 120))
+          timeUpdateSchedule = context.system.scheduler.schedule(0 millisecond,10 second) {
+            connect ! TimeUpdate(0,9999);//KeepAliveClientPacket(System.currentTimeMillis())
+            //world ! GetPlayersPosition(player)
+          }
       }
-    }
+
+    case InventoryController.UpdateInventory(inv) =>
+      player.inventory = inv
+
     case chunk: Chunk =>
       connect ! chunk.toPacket(skylight = true, entireChunk = true)
 
@@ -149,7 +159,14 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       inventoryController ! InventoryController.HandleInventoryPacket(click)
 
     case p: PlayerDiggingPacket =>
-      println("player digging" +p.status)
+      world ! World.PlayerDigging(player, DiggingStatus(p.status.int), p.position, BlockFace(p.face).asInstanceOf[BlockFaceVal])
+
+    case p: BlockPlacePacket =>
+      world ! World.PlayerPlaceBlock(player, p.position, BlockFace(p.face.int).asInstanceOf[BlockFaceVal], p.hand.int.toByte, p.cursorPositionX, p.cursorPositionY, p.cursorPositionZ)
+
+    case HeldItemChangePacketServer(slot) =>
+      player.selectedSlot = slot.toByte
+      println("sel slot"+slot)
 
     case DisconnectSession(reason) =>
         val printer = Printer.noSpaces.copy(dropNullKeys = true)

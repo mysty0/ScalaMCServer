@@ -29,7 +29,6 @@ class PluginController extends Actor with ActorLogging{
 
     case AddPlugins(pls) =>
       log.info("Load plugins complete, load {} plugins",pls.length)
-      pls(0).mainActor ! "something"
       plugins.appendAll(pls)
   }
 }

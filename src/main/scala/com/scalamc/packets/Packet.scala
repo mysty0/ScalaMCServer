@@ -10,7 +10,6 @@ import com.scalamc.models.enums.PacketEnum
 import com.scalamc.models.enums.PacketEnum.EnumVal
 import com.scalamc.models.metadata.{EntityMetadata, EntityMetadataRaw}
 import com.scalamc.models.utils.{VarInt, VarLong}
-import com.scalamc.packets.game.player.DiggingStatus
 import com.scalamc.utils.{ByteBuffer, ByteStack, ClassFieldsCache}
 import com.scalamc.utils.BytesUtils._
 import com.xorinc.scalanbt.tags._
@@ -59,7 +58,8 @@ object Packet{
   }
 
   def getPacket(id: Byte, protocolId: Int, state: PacketState.Value = PacketState.Playing, direction: PacketDirection.Value = PacketDirection.Server) =
-    packets.find((p)=>(p._1.ids(protocolId)==id||p._1.ids(-1)==id)&&p._1.state==state&&p._1.direction==direction).get._2
+    packets.find((p) => (p._1.ids(protocolId) == id || p._1.ids(-1) == id) && p._1.state == state && p._1.direction == direction).get._2
+
 
   def fromByteBuffer(buf: ByteBuffer, state: PacketState.Value = PacketState.Playing)(implicit protocolId: Int): Packet ={
     val packet = getPacket(buf(0),protocolId, state).newInstance()
@@ -92,7 +92,7 @@ abstract class Packet(val packetInfo: PacketInfo) {
   def read(byteBuffer: ByteBuffer): Unit ={
     val stack = new ByteStack(byteBuffer.toArray)
     readFields(stack, this)
-    println("read end ",javax.xml.bind.DatatypeConverter.printHexBinary(stack.toArray))
+    //println("read end ",javax.xml.bind.DatatypeConverter.printHexBinary(stack.toArray))
   }
 
   def readFields(stack: ByteStack, obj: Any): Unit ={

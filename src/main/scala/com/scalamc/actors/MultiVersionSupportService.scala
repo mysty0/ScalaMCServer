@@ -1,6 +1,6 @@
 package com.scalamc.actors
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.Tcp.Write
 import com.scalamc.actors.ConnectionHandler.Disconnect
 import com.scalamc.models.utils.VarInt
@@ -8,34 +8,35 @@ import com.scalamc.packets.{Packet, PacketDirection}
 import com.scalamc.packets.game.{KeepAliveClientPacket, KeepAliveClientPacketOld, KeepAliveServerPacket, KeepAliveServerPacketOld}
 
 object MultiVersionSupportService{
-  def props(client: ActorRef, connectionHandler: ActorRef, protocolId: Int = 0) = Props(
-    new MultiVersionSupportService(client, connectionHandler, protocolId = protocolId)
+  def props(connectionHandler: ActorRef, protocolId: Int = 0) = Props(
+    new MultiVersionSupportService(connectionHandler, protocolId = protocolId)
   )
 }
 
-class MultiVersionSupportService(client: ActorRef, connectionHandler: ActorRef, implicit var protocolId: Int) extends Actor{
+class MultiVersionSupportService(connectionHandler: ActorRef, implicit var protocolId: Int) extends Actor with ActorLogging{
 
-  val session = context.actorOf(Session.props(self))
+  val session = context.actorOf(Session.props(self), "session")
 
   override def receive = {
-    case p: KeepAliveServerPacket if protocolId >= 339 => client ! Write(p)
-    case p: KeepAliveServerPacket => client ! Write(KeepAliveServerPacketOld(VarInt(p.id.toInt)))
+    case p: KeepAliveServerPacket if protocolId >= 339 => ConnectionHandler.SendPacket(p)
+    case p: KeepAliveServerPacket => ConnectionHandler.SendPacket(KeepAliveServerPacketOld(VarInt(p.id.toInt)))
 
     case p: KeepAliveClientPacket if protocolId >= 339 => session ! p
-    case p: KeepAliveClientPacketOld => client ! KeepAliveServerPacket(p.id.int.toLong)
+    case p: KeepAliveClientPacketOld => ConnectionHandler.SendPacket(KeepAliveServerPacket(p.id.int.toLong))
 
     case d: Disconnect =>
       session ! Disconnect()
-      client ! Disconnect()
+      //client ! Disconnect()
       println("disconnect support service")
       context stop self
 
     case p: Packet =>
       p.packetInfo.direction match{
-        case PacketDirection.Client => client ! Write(p)
+        case PacketDirection.Client => connectionHandler ! ConnectionHandler.SendPacket(p)//client ! Write(p)
         case PacketDirection.Server => session ! p
       }
-    case other => connectionHandler ! other
+    case other =>
+      connectionHandler ! other
   }
 
 }

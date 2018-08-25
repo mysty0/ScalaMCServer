@@ -6,7 +6,7 @@ import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
 import com.scalamc.ScalaMC
-import com.scalamc.actors.ConnectionHandler.{ChangeState, Disconnect}
+import com.scalamc.actors.ConnectionHandler.Disconnect
 import com.scalamc.actors.Session._
 import com.scalamc.actors.World.GetChunksForDistance
 
@@ -88,7 +88,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
           connect ! LoginSuccessPacket(player.uuid.toString, p.name)
           connect ! JoinGamePacket(0, GameMode.Survival)
           //connect ! PluginMessagePacketServer("MC|Brand", "name".getBytes("UTF-8"))
-          sender() ! ChangeState(ConnectionState.Playing)
+          connect ! ConnectionHandler.HandlePlayPackets()
           connect ! PlayerPositionAndLookPacketClient(0.0, 65.0)
           world ! World.JoinPlayer(player)
           inventoryController ! InventoryController.SetSlot(44, new InventoryItem(1, count = 120))
@@ -188,7 +188,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       timeUpdateSchedule.cancel()
       context stop self
 
-    case packet: Packet => connect ! packet
+    //case packet: Packet => connect ! packet
   }
 
 

@@ -9,7 +9,7 @@ import com.scalamc.objects.ServerStats
 import com.scalamc.packets.{Packet, PacketInfo}
 import com.scalamc.packets.login.{JoinGamePacket, LoginStartPacket, LoginSuccessPacket}
 import org.scalatest.{FeatureSpec, FunSuite, GivenWhenThen, Matchers}
-import com.scalamc.utils.{ByteBuffer, PacketStack}
+import com.scalamc.utils.ByteBuffer
 import com.scalamc.utils.BytesUtils._
 import org.clapper.classutil.ClassInfo
 import com.scalamc.models.utils.VarInt._
@@ -49,63 +49,12 @@ class PacketTest extends FunSuite with GivenWhenThen with Matchers {
 //    Then("buff")
 //  }
 
-  test("ReadPacketLengthTest") {
-    // Given
-    val data = ByteString(9, 1, 1, 2, 3, 4, 5, 6, 7, 8)
-    var pingPacket: ByteBuffer = null
-    val stackPacket = new PacketStack(data.toArray)
-
-    // When
-    val len = stackPacket.popPacketLength()
-
-    // Then
-    assert(len == 9)
-  }
-
-  test("ReadPacketLengthEdgeTest") {
-    // Given
-    val data = ByteString(127, 1, 1, 2, 3, 4, 5, 6, 7, 8)
-    var pingPacket: ByteBuffer = null
-    val stackPacket = new PacketStack(data.toArray)
-
-    // When
-    val len = stackPacket.popPacketLength()
-
-    // Then
-    assert(len == 127)
-  }
-
-  test("ReadPacketLengthMultiByteTest") {
-    // Given
-    val data = ByteString(255, 255, 255, 255, 7 , 1, 1, 2, 3, 4, 5, 6, 7, 8)
-    var pingPacket: ByteBuffer = null
-    val stackPacket = new PacketStack(data.toArray)
-
-    // When
-    val len = stackPacket.popPacketLength()
-
-    // Then
-    assert(len == 2147483647)
-  }
 
 
-  test("ReadPingPacketTest") {
-    val data = ByteString(9, 1, 1, 2, 3, 4, 5, 6, 7, 8)
-    Given(data.toString())
-    var pingPacket: ByteBuffer = null
-    val stackPacket = new PacketStack(data.toArray)
-    stackPacket.handlePackets((packet)=>{pingPacket = packet})
-    assert(pingPacket == new ByteBuffer(Array(1, 1, 2, 3, 4, 5, 6, 7, 8)))
-  }
 
-  test("ReadPingAndLoginPacketTest") {
-    val data = ByteString(9, 1, 1, 2, 3, 4, 5, 6, 7, 8, 6, 0, 1, 1, 1, 1, 1)
-    Given(data.toString())
-    var pingPacket: ByteBuffer = null
-    val stackPacket = new PacketStack(data.toArray)
-    stackPacket.handlePackets((packet)=>{pingPacket = packet})
-    assert(pingPacket == new ByteBuffer(Array(0, 1, 1, 1, 1, 1)))
-  }
+
+
+
 
   test("WritePacketTest"){
 

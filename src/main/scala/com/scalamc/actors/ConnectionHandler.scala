@@ -4,78 +4,102 @@ import akka.actor._
 import akka.util.{ByteString, Timeout}
 import akka.pattern.ask
 import akka.util.Timeout
+
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.concurrent.ExecutionContext.Implicits.global
-
-import com.scalamc.actors.ConnectionHandler.{ChangeState, Disconnect, HandleLogin}
+import com.scalamc.actors.ConnectionHandler._
+import com.scalamc.actors.PacketProcessor.ProcessedPacket
 import com.scalamc.packets.{Packet, PacketState}
 import com.scalamc.packets.status.Handshake
 import com.scalamc.utils._
 
-object ConnectionState extends Enumeration{
-  val Login, Playing, Status = Value
-
-  implicit def connState2PacketState(connState: ConnectionState.Value): PacketState.Value = connState match{
-    case Login => PacketState.Login
-    case Status => PacketState.Status
-    case Playing => PacketState.Playing
-  }
-}
 
 object ConnectionHandler {
-  case class ChangeState(state: ConnectionState.Value)
-  case class HandleLogin(protocolId: Int)
+  case class HandleStatusPackets()
+  case class HandleLoginPackets(protocolId: Int)
+  case class HandlePlayPackets()
+  case class SendPacket(packet: Packet)
   case class Disconnect()
 }
 
-class ConnectionHandler extends Actor {
+class ConnectionHandler extends Actor with ActorLogging with Stash {
   import akka.io.Tcp._
 
   implicit val timeout: Timeout = Timeout(5 seconds)
 
-  lazy val statsService: ActorRef = context.actorOf(ServerStatsHandler.props(sender()))
+  var client: Option[ActorRef] = None
 
-  var session: ActorRef = _
+  val handshakeHandler: ActorRef = context.actorOf(HandshakeHandler.props(), "handshakeHandler")
+  val packetProcessor: ActorRef = context.actorOf(PacketProcessor.props(), "packetProcessor")
 
-  var state: ConnectionState.Value = ConnectionState.Status
+  var session: Option[ActorRef] = None
 
   implicit var protocolId: Int = 0
 
-  def receive = {
+  def receive: Receive = handlePackets orElse status
+
+  def handlePackets: Receive = {
     case Received(data) =>
-      implicit val dataForParser: ByteString = data
-      val stack = new PacketStack(data.toArray)
-      stack.handlePackets(parsePacket)
+      if(client.isEmpty) client = Some(sender())
+      log.info("process packets: {}", javax.xml.bind.DatatypeConverter.printHexBinary(data.toArray))
+      packetProcessor ! PacketProcessor.ProcessPackets(new ByteStack(data.toArray))
 
 
-    case cs: ChangeState =>
-      println("chage state", protocolId)
-      state = cs.state
+    case SendPacket(pack) =>
+      client foreach {_ ! Write(pack)}
 
     case PeerClosed =>
-      if(session != null) session ! Disconnect()
-      println("disconnect handler", session, protocolId)
+      session foreach {_ ! Disconnect()}
       context stop self
   }
 
-  private def parsePacket(packet: ByteBuffer)(implicit data: ByteString): Unit = {
-    println("packet ", javax.xml.bind.DatatypeConverter.printHexBinary(data.toArray))
-    if (state == ConnectionState.Login || state == ConnectionState.Playing) {
-      println("packet id", packet(0))
-      session ! Packet.fromByteBuffer(packet, state)
-    } else {
-      val future = statsService ? Packet.fromByteBuffer(packet, state)
-      Await.result(future, timeout.duration) match{
-        case HandleLogin(protId) =>
-          protocolId = protId
-          state = ConnectionState.Login
-          println(state)
-          session = context.actorOf(MultiVersionSupportService.props(sender(), self, protocolId))
-        case other =>
-      }
-    }
+  def status: Receive = {
+
+    case PacketProcessor.ProcessedPacket(pack) =>
+      log.info("process status packet: {}", javax.xml.bind.DatatypeConverter.printHexBinary(pack.toArray))
+      handshakeHandler ! Packet.fromByteBuffer(pack, PacketState.Status)
+      context.become(waitLogin)
+  }
+
+  def waitLogin: Receive = {
+    case HandleLoginPackets(protId) =>
+      protocolId = protId
+      session = Some(context.actorOf(MultiVersionSupportService.props(self, protocolId), "MultiVersionSupportService"))
+      context.unbecome()
+      context.unbecome()
+      context.become(handlePackets orElse login)
+      unstashAll()
+
+    case _: HandleStatusPackets =>
+      context.unbecome()
+      unstashAll()
+
+    case other =>
+      stash()
+  }
+
+  def login: Receive = {
+
+    case PacketProcessor.ProcessedPacket(pack) =>
+      log.info("process login packet: {}", javax.xml.bind.DatatypeConverter.printHexBinary(pack.toArray))
+      session foreach {_ ! Packet.fromByteBuffer(pack, PacketState.Login)}
+
+    case _:HandlePlayPackets =>
+      context.unbecome()
+      context.become(handlePackets orElse play)
+      //context.become(play)
+
+    case other => log.info("recive login other "+other)
+  }
+
+  def play: Receive = {
+    case PacketProcessor.ProcessedPacket(pack) =>
+      log.info("process play packet: {}", javax.xml.bind.DatatypeConverter.printHexBinary(pack.toArray))
+      session foreach {_ ! Packet.fromByteBuffer(pack, PacketState.Playing)}
+    //if(session.isDefined) session.get ! Packet.fromByteBuffer(pack, PacketState.Playing)
+
   }
 
 }

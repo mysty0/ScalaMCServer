@@ -3,7 +3,6 @@ package com.scalamc.actors
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp.Write
 import akka.util.ByteString
-import com.scalamc.actors.ConnectionHandler.HandleLogin
 import com.scalamc.objects.ServerStats
 import com.scalamc.packets.status.{Handshake, PingPacket, PongPacket, StatusPacket}
 import com.scalamc.packets.Packet._
@@ -14,31 +13,32 @@ import io.circe.syntax._
 
 import scala.collection.mutable.ArrayBuffer
 
-object ServerStatsHandler{
-  def props(client: ActorRef) = Props(
-    new ServerStatsHandler(client)
+object HandshakeHandler{
+  def props() = Props(
+    new HandshakeHandler()
   )
+
 }
 
-class ServerStatsHandler(client: ActorRef) extends Actor{
-  implicit var protocolId = 0
+class HandshakeHandler() extends Actor{
+  var protocolId: Option[Int] = None
 
   override def receive = {
-
     case pack: Handshake =>
-      protocolId = pack.protocolVersion.int
+      protocolId = Some(pack.protocolVersion.int)
+      implicit val protId = pack.protocolVersion.int
       pack.nextState.int match {
         case 1 =>
           val stats = Printer.noSpaces.copy(dropNullKeys = true).pretty(ServerStats.getStatus.asJson)
-          client ! Write(StatusPacket(stats))
-          sender() ! Unit
+          sender() ! ConnectionHandler.HandleStatusPackets()
+          sender() ! ConnectionHandler.SendPacket(StatusPacket(status = stats))
         case 2 =>
-          sender() ! HandleLogin(protocolId)
+          sender() ! ConnectionHandler.HandleLoginPackets(protId)
           context stop self
       }
     case pack: PingPacket =>
-      client ! Write(PongPacket(pack.payload))
-      sender() ! Unit
+      sender() ! ConnectionHandler.HandleStatusPackets()
+      sender() ! ConnectionHandler.SendPacket(PongPacket(pack.payload))
   }
 }
 

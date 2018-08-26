@@ -5,8 +5,9 @@ import java.util.UUID
 import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable, Props}
 import akka.pattern.ask
 import akka.util.Timeout
+import com.scalamc.ScalaMC
 import com.scalamc.actors.world.generators.GeneratorsMessages
-import com.scalamc.actors.{EntityController, Session}
+import com.scalamc.actors.{EntityController, EventController, Session}
 import com.scalamc.models.entity.Entity
 import com.scalamc.models.enums.BlockFace.BlockFaceVal
 import com.scalamc.models.enums.DiggingStatus
@@ -24,7 +25,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.Try
 
-
 object World{
 
   def props(chunkGenerator: ActorRef) = Props(
@@ -36,24 +36,26 @@ object World{
   private val period = 100.millisecond
   private val timeout = 5.second
 
-  case object Tick
-  case class JoinPlayer(player: Player)
-  case class LoadFirstChunks(player: Player)
-  case class DisconnectPlayer(player: Player, reason: Chat)
-  case class UpdateEntityPosition(entityId: Int, loc: Location)
-  case class UpdateEntityPositionAndLook(entityId: Int, loc: Location)
-  case class UpdateEntityLook(entityId: Int, loc: Location)
-  case class AnimateEntity(entityId: Int, animationId: Byte)
-  case class SendPacketToAllPlayers(packet: Packet)
+  trait WorldEvent
 
-  case class SetBlock(position: Position, block: Block)
+  case object Tick                                                    extends WorldEvent
+  case class JoinPlayer(player: Player)                               extends WorldEvent
+  case class LoadFirstChunks(player: Player)                          extends WorldEvent
+  case class DisconnectPlayer(player: Player, reason: Chat)           extends WorldEvent
+  case class UpdateEntityPosition(entityId: Int, loc: Location)       extends WorldEvent
+  case class UpdateEntityPositionAndLook(entityId: Int, loc: Location)extends WorldEvent
+  case class UpdateEntityLook(entityId: Int, loc: Location)           extends WorldEvent
+  case class AnimateEntity(entityId: Int, animationId: Byte)          extends WorldEvent
+  case class SendPacketToAllPlayers(packet: Packet)                   extends WorldEvent
 
-  case class PlayerDigging(player: Player, diggingStatus: DiggingStatusVal, blockPosition: Position, blockFace: BlockFaceVal)
+  case class SetBlock(position: Position, block: Block)               extends WorldEvent
+
+  case class PlayerDigging(player: Player, diggingStatus: DiggingStatusVal, blockPosition: Position, blockFace: BlockFaceVal) extends WorldEvent
   case class PlayerPlaceBlock(player: Player, position: Position,
                               face: BlockFaceVal,
                               hand: Byte, cursorX: Float,
                               cursorY: Float,
-                              cursorZ: Float)
+                              cursorZ: Float) extends WorldEvent
 }
 
 class World(chunkGenerator: ActorRef) extends Actor with ActorLogging{
@@ -129,7 +131,18 @@ class World(chunkGenerator: ActorRef) extends Actor with ActorLogging{
       playersLastChunkUpdateLocation += (player.uuid -> player.location)
   }
 
-  override def receive = {
+  override def receive: Receive ={
+    case some =>
+      processEvent(some)
+      sendEvents(some)
+  }
+
+  def sendEvents: Receive ={
+    case event: WorldEvent => ScalaMC.eventController ! EventController.NewWorldEvent(event)
+    case _ =>
+  }
+
+  def processEvent: Receive = {
     case SendPacketToAllPlayers(p) => players.foreach(_.session ! p)
 
     case SetBlock(pos, block) =>
@@ -248,7 +261,7 @@ class World(chunkGenerator: ActorRef) extends Actor with ActorLogging{
         ent.hasRotate = true
         //players.filter(_.uuid != pl.uuid).foreach(_.session ! ChangeEntityLook(pl.entityId, angYaw, angPitch))
       }
-  }
 
+  }
 
 }

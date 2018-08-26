@@ -29,3 +29,11 @@ libraryDependencies += "org.scalatest" % "scalatest_2.12" % "3.0.4" % "test"
 libraryDependencies += "org.clapper" %% "classutil" % "1.1.2"
 
 libraryDependencies += "org.reflections" % "reflections" % "0.9.10"
+
+lazy val root = (project in file(".")).
+  settings(
+    name := "ScalaMC",
+    version := "1.0",
+    scalaVersion := "2.11.4",
+    mainClass in Compile := Some("com.scalamc.ScalaMC")
+  )

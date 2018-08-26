@@ -75,8 +75,18 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
     connect ! SpawnPlayerPacket(VarInt(pl.entityId), pl.uuid, pl.location.x, pl.location.y, pl.location.z, pl.location.yaw.toByte, pl.location.pitch.toByte)
   }
 
+  override def receive: Receive ={
+    case some =>
+      processPacket(some)
+      sendEvents(some)
+  }
 
-  override def receive: PartialFunction[Any, Unit] = {
+  def sendEvents: Receive ={
+    case packet: Packet => ScalaMC.eventController ! EventController.NewPacket(packet)
+    case _ =>
+  }
+
+  def processPacket: Receive = {
     case p: LoginStartPacket =>
       val future = ScalaMC.entityIdManager ? EntityIdManager.GetId
       Await.result(future, timeout.duration) match{
@@ -190,7 +200,8 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
 
     case SendPacketToConnect(packet) =>
       connect ! packet
+
+    case _ =>
+
   }
-
-
 }

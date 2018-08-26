@@ -1,6 +1,6 @@
 package com.scalamc.models.entity
 
-import com.scalamc.actors.World
+import com.scalamc.actors.world.World
 import com.scalamc.models.Location
 
 trait Entity {

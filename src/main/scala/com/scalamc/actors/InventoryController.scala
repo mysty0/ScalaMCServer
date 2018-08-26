@@ -25,10 +25,10 @@ class InventoryController(session: ActorRef) extends Actor{
   override def receive: Receive = {
     case SetSlot(slot, item) =>
       inventory.items(slot) = item
-      session ! SetSlotPacket(0, slot.toShort, item.toRaw)
+      session ! Session.SendPacketToConnect(SetSlotPacket(0, slot.toShort, item.toRaw))
       session ! UpdateInventory(inventory)
     case SetInventory(inv) =>
-      inv.items.indices.foreach(i => if(inventory.items(i) != inv.items(i)) session ! SetSlotPacket(0, i.toShort, inv.items(i).toRaw))
+      inv.items.indices.foreach(i => if(inventory.items(i) != inv.items(i)) session ! Session.SendPacketToConnect(SetSlotPacket(0, i.toShort, inv.items(i).toRaw)))
       inventory = inv
       session ! UpdateInventory(inventory)
     case GetInventory =>

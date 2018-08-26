@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.actor.{Actor, ActorRef, Props}
 import com.scalamc.actors.EntityController._
+import com.scalamc.actors.world.World
 import com.scalamc.models.Location
 import com.scalamc.models.entity.{Entity, Mob}
 import org.reflections.Reflections

@@ -8,7 +8,7 @@ import akka.util.Timeout
 import com.scalamc.ScalaMC
 import com.scalamc.actors.ConnectionHandler.Disconnect
 import com.scalamc.actors.Session._
-import com.scalamc.actors.World.GetChunksForDistance
+import com.scalamc.actors.world.World
 
 import scala.concurrent.duration._
 import com.scalamc.models.world.Block
@@ -40,6 +40,8 @@ object Session{
     new Session(connect)
   )
 
+  case class SendPacketToConnect(packet: Packet)
+
   case class DisconnectSession(reason: Chat)
   case class DisconnectPlayer(player: Player)
   case class AddNewPlayer(player: Player)
@@ -49,7 +51,7 @@ object Session{
   case class TeleportEntity(entityId: Int, location: Location)
   case class AnimationEntity(entityId: Int, animationId: Byte)
   case class LoadChunk(chunk: Chunk)
-  case class UnloadChunk(chunk: Chunk)
+  case class UnloadChunk(x: Int, z: Int)
 }
 
 class Session(connect: ActorRef) extends Actor with ActorLogging {
@@ -84,7 +86,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
           //        self ! DisconnectSession(Chat("You already playing on this server"))
           //      }
           //Players.players += player
-          println("new player connect",p.name, player.uuid, player.entityId)
+          log.info("new player connect",p.name, player.uuid, player.entityId)
           connect ! LoginSuccessPacket(player.uuid.toString, p.name)
           connect ! JoinGamePacket(0, GameMode.Survival)
           //connect ! PluginMessagePacketServer("MC|Brand", "name".getBytes("UTF-8"))
@@ -107,8 +109,8 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
     case LoadChunk(chunk) =>
       connect ! chunk.toPacket(skylight = true, entireChunk = true)
 
-    case UnloadChunk(chunk) =>
-      connect ! UnloadChunkPacket(chunk.x, chunk.y)
+    case UnloadChunk(x, z) =>
+      connect ! UnloadChunkPacket(x, z)
 
     case ChatMessagePacket(msg)=>
       chatHandler ! ChatHandler.NewMessage(msg, player)
@@ -132,9 +134,8 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       connect ! AnimationPacketClient(eId, aId)
 
     case p: ClientSettingsPacket =>
-      println("setts", p)
       player.settings = new PlayerSettings(p)
-      world ! World.GetChunksForDistance(player.location, player.settings.viewDistance)
+      world ! World.LoadFirstChunks(player)
     case p: TeleportConfirmPacket =>
 
     case RelativeMove(id, x, y, z) =>
@@ -166,7 +167,6 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
 
     case HeldItemChangePacketServer(slot) =>
       player.selectedSlot = slot.toByte
-      println("sel slot"+slot)
 
     case DisconnectSession(reason) =>
         val printer = Printer.noSpaces.copy(dropNullKeys = true)
@@ -188,7 +188,8 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       timeUpdateSchedule.cancel()
       context stop self
 
-    //case packet: Packet => connect ! packet
+    case SendPacketToConnect(packet) =>
+      connect ! packet
   }
 
 

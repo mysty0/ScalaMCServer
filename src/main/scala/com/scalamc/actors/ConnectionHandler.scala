@@ -67,8 +67,6 @@ class ConnectionHandler extends Actor with ActorLogging with Stash {
     case HandleLoginPackets(protId) =>
       protocolId = protId
       session = Some(context.actorOf(MultiVersionSupportService.props(self, protocolId), "MultiVersionSupportService"))
-      context.unbecome()
-      context.unbecome()
       context.become(handlePackets orElse login)
       unstashAll()
 
@@ -87,7 +85,6 @@ class ConnectionHandler extends Actor with ActorLogging with Stash {
       session foreach {_ ! Packet.fromByteBuffer(pack, PacketState.Login)}
 
     case _:HandlePlayPackets =>
-      context.unbecome()
       context.become(handlePackets orElse play)
       //context.become(play)
 
@@ -97,7 +94,14 @@ class ConnectionHandler extends Actor with ActorLogging with Stash {
   def play: Receive = {
     case PacketProcessor.ProcessedPacket(pack) =>
       log.info("process play packet: {}", javax.xml.bind.DatatypeConverter.printHexBinary(pack.toArray))
-      session foreach {_ ! Packet.fromByteBuffer(pack, PacketState.Playing)}
+      try {
+        session foreach {
+          _ ! Packet.fromByteBuffer(pack, PacketState.Playing)
+        }
+      } catch {
+        case e: Exception =>
+          log.error("Packet parse error2 "+e)
+      }
     //if(session.isDefined) session.get ! Packet.fromByteBuffer(pack, PacketState.Playing)
 
   }

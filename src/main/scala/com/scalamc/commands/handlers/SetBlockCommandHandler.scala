@@ -1,7 +1,7 @@
 package com.scalamc.commands.handlers
 
 import akka.actor.Actor
-import com.scalamc.actors.World
+import com.scalamc.actors.world.World
 import com.scalamc.commands.CommandHandlerEvents
 import com.scalamc.models.Position
 import com.scalamc.models.world.Block

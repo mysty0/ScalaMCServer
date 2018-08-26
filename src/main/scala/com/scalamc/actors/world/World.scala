@@ -1,41 +1,44 @@
-package com.scalamc.actors
+package com.scalamc.actors.world
 
 import java.util.UUID
 
-import akka.actor.{Actor, ActorRef, Cancellable, Props}
-import com.scalamc.actors.Session.AddNewPlayer
-import com.scalamc.actors.World._
+import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable, Props}
+import akka.pattern.ask
+import akka.util.Timeout
+import com.scalamc.actors.world.generators.GeneratorsMessages
+import com.scalamc.actors.{EntityController, Session}
 import com.scalamc.models.entity.Entity
 import com.scalamc.models.enums.BlockFace.BlockFaceVal
 import com.scalamc.models.enums.DiggingStatus
 import com.scalamc.models.enums.DiggingStatus.DiggingStatusVal
 import com.scalamc.models.world.Block
+import com.scalamc.models.world.chunk.Chunk
 import com.scalamc.models.{Chat, Location, Player, Position}
-import com.scalamc.models.world.chunk.generators.FlatChunkGenerator
-import com.scalamc.models.world.chunk.{Chunk, ChunkGenerator}
 import com.scalamc.packets.Packet
 import com.scalamc.packets.game.BlockChangePacket
 import com.scalamc.utils.Utils
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.util.Try
 
 
 object World{
 
-  case class GetChunksForDistance(location: Location, distance: Int)
-
-  def props(chunkGenerator: ChunkGenerator = new FlatChunkGenerator()) = Props(
+  def props(chunkGenerator: ActorRef) = Props(
     new World(chunkGenerator)
   )
 
   private val minChunkUpdateDistance = 10
 
   private val period = 100.millisecond
+  private val timeout = 5.second
 
   case object Tick
   case class JoinPlayer(player: Player)
+  case class LoadFirstChunks(player: Player)
   case class DisconnectPlayer(player: Player, reason: Chat)
   case class UpdateEntityPosition(entityId: Int, loc: Location)
   case class UpdateEntityPositionAndLook(entityId: Int, loc: Location)
@@ -53,8 +56,10 @@ object World{
                               cursorZ: Float)
 }
 
-class World(chunkGenerator: ChunkGenerator) extends Actor{
-  import context._
+class World(chunkGenerator: ActorRef) extends Actor with ActorLogging{
+  import World._
+
+  implicit val ec = ExecutionContext.global
 
   val entityController: ActorRef = context.actorOf(EntityController.props(this.self), "entityController")
 
@@ -68,12 +73,20 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
     scheduler = context.system.scheduler.schedule(period, period, self, Tick)
   }
 
-  def getChunk(x: Int, z: Int): Chunk = {
+  def getChunk(x: Int, z: Int): Future[Chunk] = {
     val key = (x.toLong << 32) | (z & 0xffffffffL)
-    if(!chunks.contains(key))
-      chunks(key) = chunkGenerator.generateChunk(x, z, 123)
-    chunks(key)
-
+    if(!chunks.contains(key)) {
+      implicit val timeout: Timeout = World.timeout
+      return chunkGenerator ? GeneratorsMessages.GenerateChunk(x, z) flatMap {
+        f => Future{
+          val newChunk = f.asInstanceOf[GeneratorsMessages.GeneratedChunk].chunk
+          chunks += key -> newChunk
+          newChunk
+        }
+      }
+    }
+    //chunks(key)
+    Future{chunks(key)}
   }
   def setChunk(x: Int, z: Int, chunk: Chunk) = chunks((x.toLong << 32) | (z & 0xffffffffL)) = chunk
 
@@ -86,11 +99,11 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
   }
 
   def unloadChunk(x: Int, z: Int, player: Player): Unit ={
-    player.session ! Session.UnloadChunk(getChunk(x, z))
+    player.session ! Session.UnloadChunk(x, z)
   }
 
   def loadChunk(x: Int, z: Int, player: Player): Unit ={
-    player.session ! Session.LoadChunk(getChunk(x, z))
+    getChunk(x, z) foreach {player.session ! Session.LoadChunk(_)}
   }
 
   def updatePlayerChunks(player: Player): Unit ={
@@ -120,7 +133,7 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
     case SendPacketToAllPlayers(p) => players.foreach(_.session ! p)
 
     case SetBlock(pos, block) =>
-      getChunk(pos.x >> 4, pos.z >> 4).setBlock(pos.toChunkRelativePosition, block)
+      getChunk(pos.x >> 4, pos.z >> 4) foreach {_.setBlock(pos.toChunkRelativePosition, block)}
       println("set block at "+pos)
       self ! SendPacketToAllPlayers(BlockChangePacket(pos, block))
 
@@ -153,18 +166,18 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
         ent.previousLocation = ent.location
       }
 
-    case GetChunksForDistance(location, distance) =>
-      val pos = location.toPosition
+    case LoadFirstChunks(player) =>
+      val pos = player.location.toPosition
 
       val centralX = pos.x >> 4
       val centralZ = pos.z >> 4
-      println("ceb x", centralX)
 
-      val dist = distance/2
+      val dist = player.settings.viewDistance/2
 
       for(x <- centralX - dist to centralX+dist)
         for(z <- centralZ - dist to centralZ + dist){
-          sender() ! getChunk(x, z)
+          //sender() ! getChunk(x, z)
+          loadChunk(x, z, player)
         }
 
     case JoinPlayer(p) =>
@@ -188,12 +201,12 @@ class World(chunkGenerator: ChunkGenerator) extends Actor{
       }
 
     case PlayerDigging(player, status, pos, face) =>
-      if(status == DiggingStatus.FinishedDigging) getChunk(pos.x >> 4, pos.z >> 4).setBlock(pos.toChunkRelativePosition, Block(0,0))
+      if(status == DiggingStatus.FinishedDigging) getChunk(pos.x >> 4, pos.z >> 4) foreach {_.setBlock(pos.toChunkRelativePosition, Block(0,0))}
       players.filter(_.entityId != player.entityId).foreach {pl => pl.session ! BlockChangePacket(pos, Block(0,0))}
 
     case PlayerPlaceBlock(player, pos, face, hand, cX, cY, cZ) =>
       val block = Block(player.inventory.items(36+player.selectedSlot).id, 0)
-      getChunk(pos.x >> 4, pos.z >> 4).setBlock((pos+face.posMod).toChunkRelativePosition, block)//player.inventory.items(player.selectedSlot).id
+      getChunk(pos.x >> 4, pos.z >> 4) foreach {_.setBlock((pos+face.posMod).toChunkRelativePosition, block)}//player.inventory.items(player.selectedSlot).id
       players.filter(_.entityId != player.entityId).foreach {pl => pl.session ! BlockChangePacket(pos+face.posMod, block)}
 
     case UpdateEntityPosition(id, loc) =>

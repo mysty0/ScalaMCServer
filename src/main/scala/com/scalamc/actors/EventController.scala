@@ -29,9 +29,9 @@ class EventController extends Actor with ActorLogging{
       eventHandlers(eventType) = eventHandlers(eventType)+handler
 
     case NewPacket(packet) =>
-      eventHandlers getOrElseUpdate (EventTypes.Packet, Set()) foreach {_ ! packet}
+      eventHandlers getOrElseUpdate (EventTypes.Packet, Set()) foreach {_.tell(packet, sender())}
 
     case NewWorldEvent(worldEvent) =>
-      eventHandlers getOrElseUpdate (EventTypes.World, Set()) foreach {_ ! worldEvent}
+      eventHandlers getOrElseUpdate (EventTypes.World, Set()) foreach {_.tell(worldEvent, sender())}
   }
 }

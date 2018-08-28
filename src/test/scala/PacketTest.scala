@@ -1,9 +1,9 @@
 import akka.util.ByteString
 import com.scalamc.actors.ConnectionHandler
-import com.scalamc.models.enums.Difficulty.{DifficultyVal, Easy}
-import com.scalamc.models.enums.Dimension.{DimensionVal, Overworld}
-import com.scalamc.models.enums.GameMode.{Creative, GameModeVal}
-import com.scalamc.models.enums.LevelType.{Default, LevelTypeVal}
+import com.scalamc.models.enums.Difficulty.{Difficulty, Easy}
+import com.scalamc.models.enums.Dimension.{Dimension, Overworld}
+import com.scalamc.models.enums.GameMode.{Creative, GameMode}
+import com.scalamc.models.enums.LevelType.{Default, LevelType}
 import com.scalamc.models.utils.VarInt
 import com.scalamc.objects.ServerStats
 import com.scalamc.packets.{Packet, PacketInfo}
@@ -57,11 +57,11 @@ class PacketTest extends FunSuite with GivenWhenThen with Matchers {
 
     // Given
     var id: Int = 0
-    var gamemode: GameModeVal = Creative
-    var dimension: DimensionVal = Overworld
-    var difficulty: DifficultyVal = Easy
+    var gamemode: GameMode = Creative
+    var dimension: Dimension = Overworld
+    var difficulty: Difficulty = Easy
     var maxPlayer: Byte = ServerStats.serverStats.players.max.toByte
-    var levelType: LevelTypeVal = Default
+    var levelType: LevelType = Default
     var reducedDebugInfo: Boolean = true
     implicit val protocolId = 340
 

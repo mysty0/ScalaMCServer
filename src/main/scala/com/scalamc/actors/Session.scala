@@ -3,6 +3,7 @@ package com.scalamc.actors
 import java.util.UUID.randomUUID
 
 import akka.actor._
+import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.util.Timeout
 import com.scalamc.ScalaMC
@@ -16,7 +17,6 @@ import com.scalamc.models.world.chunk.Chunk
 import com.scalamc.models._
 import com.scalamc.models.enums.BlockFace.BlockFaceVal
 import com.scalamc.models.enums.{BlockFace, DiggingStatus, GameMode}
-import com.scalamc.models.enums.GameMode.GameModeVal
 import com.scalamc.models.inventory.InventoryItem
 import com.scalamc.models.utils.VarInt
 import com.scalamc.packets.Packet
@@ -56,7 +56,7 @@ object Session{
 
 class Session(connect: ActorRef) extends Actor with ActorLogging {
 
-  val world: ActorSelection = context.actorSelection("/user/defaultWorld")
+  val world: ActorSelection = context.actorSelection("/user/worldController/defaultWorld")
   val chatHandler: ActorSelection = context.actorSelection("/user/chatHandler")
   val eventController: ActorSelection = context.actorSelection("/user/eventController")
 
@@ -75,7 +75,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
     connect ! SpawnPlayerPacket(VarInt(pl.entityId), pl.uuid, pl.location.x, pl.location.y, pl.location.z, pl.location.yaw.toByte, pl.location.pitch.toByte)
   }
 
-  override def receive: Receive ={
+  override def receive: Receive = {
     case some =>
       processPacket(some)
       sendEvents(some)
@@ -91,17 +91,17 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       val future = ScalaMC.entityIdManager ? EntityIdManager.GetId
       Await.result(future, timeout.duration) match{
         case id: Int =>
-          player = Player(p.name, id, randomUUID(), this.self, ScalaMC.worldController, Location(0, 65, 0))
+          player = Player(p.name, id, randomUUID(), this.self, world, Location(0, 65, 0), None, GameMode.Survival)
           //      if(Players.players.contains(player)){
           //        self ! DisconnectSession(Chat("You already playing on this server"))
           //      }
           //Players.players += player
           log.info("new player connect",p.name, player.uuid, player.entityId)
           connect ! LoginSuccessPacket(player.uuid.toString, p.name)
-          connect ! JoinGamePacket(0, GameMode.Survival)
+          //connect ! JoinGamePacket(0, GameMode.Survival)
           //connect ! PluginMessagePacketServer("MC|Brand", "name".getBytes("UTF-8"))
           connect ! ConnectionHandler.HandlePlayPackets()
-          connect ! PlayerPositionAndLookPacketClient(0.0, 65.0)
+          //connect ! PlayerPositionAndLookPacketClient(0.0, 65.0)
           world ! World.JoinPlayer(player)
           inventoryController ! InventoryController.SetSlot(44, new InventoryItem(1, count = 120))
           timeUpdateSchedule = context.system.scheduler.schedule(0 millisecond,10 second) {
@@ -144,8 +144,9 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       connect ! AnimationPacketClient(eId, aId)
 
     case p: ClientSettingsPacket =>
-      player.settings = new PlayerSettings(p)
+      player.settings = Some(new PlayerSettings(p))
       world ! World.LoadFirstChunks(player)
+
     case p: TeleportConfirmPacket =>
 
     case RelativeMove(id, x, y, z) =>

@@ -2,15 +2,24 @@ package com.scalamc.models
 
 import java.util.UUID
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, ActorSelection}
 import com.scalamc.actors.Session
 import com.scalamc.models.ChatMode.ChatMode
 import com.scalamc.models.entity.{BoundingBox, LivingEntity}
+import com.scalamc.models.enums.GameMode.GameMode
+import com.scalamc.models.enums.PacketEnum.EnumVal
 import com.scalamc.models.inventory.Inventory
 import com.scalamc.packets.game.ClientSettingsPacket
 
 
-case class Player(var name: String, entityId: Int, var uuid: UUID, session: ActorRef, var world: ActorRef, var location: Location, var settings: PlayerSettings = null) extends LivingEntity{
+case class Player(var name: String,
+                  entityId: Int,
+                  var uuid: UUID,
+                  session: ActorRef,
+                  var world: ActorSelection,
+                  var location: Location,
+                  var settings: Option[PlayerSettings] = None,
+                  var gameMode: GameMode) extends LivingEntity{
   override var previousLocation: Location = location
   override var inventory: Inventory = _
 

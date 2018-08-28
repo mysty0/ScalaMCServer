@@ -8,11 +8,11 @@ import com.scalamc.objects.ServerStats
 import com.scalamc.packets.{Packet, PacketDirection, PacketInfo, PacketState}
 
 case class JoinGamePacket(var id: Int = 0,
-                     var gamemode: GameModeVal = Creative,
-                     var dimension: DimensionVal = Overworld,
-                     var difficulty: DifficultyVal = Easy,
+                     var gamemode: GameMode = Creative,
+                     var dimension: Dimension = Overworld,
+                     var difficulty: Difficulty = Easy,
                      var maxPlayer: Byte = ServerStats.serverStats.players.max.toByte,
-                     var levelType: LevelTypeVal = Default,
+                     var levelType: LevelType = Default,
                      var reducedDebugInfo: Boolean = false)
   extends Packet(PacketInfo(Map(-1 ->0x23.toByte), PacketState.Login, PacketDirection.Client)){
 

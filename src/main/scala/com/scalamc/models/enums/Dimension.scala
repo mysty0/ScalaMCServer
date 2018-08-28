@@ -4,11 +4,11 @@ import com.scalamc.models.enums.PacketEnum.EnumVal
 import com.scalamc.utils.BytesUtils._
 
 object Dimension extends Enumeration {
-  case class DimensionVal(override var value: Any) extends EnumVal
+  type Dimension = EnumVal
 
-  val Nether = DimensionVal(-1)
-  val Overworld = DimensionVal(0)
-  val End = DimensionVal(1)
+  val Nether = EnumVal(value = -1)
+  val Overworld = EnumVal(value = 0)
+  val End = EnumVal(value = 1)
 
 
 }

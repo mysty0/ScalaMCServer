@@ -12,11 +12,13 @@ import com.scalamc.models.entity.Entity
 import com.scalamc.models.enums.BlockFace.BlockFaceVal
 import com.scalamc.models.enums.DiggingStatus
 import com.scalamc.models.enums.DiggingStatus.DiggingStatusVal
-import com.scalamc.models.world.Block
+import com.scalamc.models.world.{Block, WorldInfo}
 import com.scalamc.models.world.chunk.Chunk
 import com.scalamc.models.{Chat, Location, Player, Position}
 import com.scalamc.packets.Packet
 import com.scalamc.packets.game.BlockChangePacket
+import com.scalamc.packets.game.player.PlayerPositionAndLookPacketClient
+import com.scalamc.packets.login.JoinGamePacket
 import com.scalamc.utils.Utils
 
 import scala.collection.mutable
@@ -27,8 +29,8 @@ import scala.util.Try
 
 object World{
 
-  def props(chunkGenerator: ActorRef) = Props(
-    new World(chunkGenerator)
+  def props(chunkGenerator: ActorRef, worldInfo: WorldInfo = WorldInfo()) = Props(
+    new World(chunkGenerator, worldInfo)
   )
 
   private val minChunkUpdateDistance = 10
@@ -58,7 +60,7 @@ object World{
                               cursorZ: Float) extends WorldEvent
 }
 
-class World(chunkGenerator: ActorRef) extends Actor with ActorLogging{
+class World(chunkGenerator: ActorRef, worldInfo: WorldInfo) extends Actor with ActorLogging{
   import World._
 
   implicit val ec = ExecutionContext.global
@@ -70,6 +72,8 @@ class World(chunkGenerator: ActorRef) extends Actor with ActorLogging{
   var players: ArrayBuffer[Player] = ArrayBuffer[Player]()
   var playersLastChunkUpdateLocation: scala.collection.mutable.Map[UUID, Location] = scala.collection.mutable.Map()
   private var scheduler: Cancellable = _
+
+  var spawnLocation: Location = Location(0, 66)
 
   override def preStart(): Unit = {
     scheduler = context.system.scheduler.schedule(period, period, self, Tick)
@@ -112,20 +116,23 @@ class World(chunkGenerator: ActorRef) extends Actor with ActorLogging{
     if(playersLastChunkUpdateLocation.contains(player.uuid)){
       val lastLoc = playersLastChunkUpdateLocation(player.uuid)
       if(lastLoc.distanceXZ(player.location) > minChunkUpdateDistance) {
-        val lastRanges = getRendererRanges(lastLoc.toPosition, player.settings.viewDistance/2)
-        val currRanges = getRendererRanges(player.location.toPosition, player.settings.viewDistance/2)
+        player.settings foreach { plSettings =>
+          val lastRanges = getRendererRanges(lastLoc.toPosition, plSettings.viewDistance/2)
+          val currRanges = getRendererRanges(player.location.toPosition, plSettings.viewDistance/2)
 
-        def applyToNonOverlappingChunks(firstRanges: (Range, Range), secondRanges: (Range, Range), action: (Int, Int)=>Unit): Unit ={
-          for(x <- firstRanges._1)
-            for(z <- firstRanges._2)
-              if(!(secondRanges._1.contains(x) && secondRanges._2.contains(z)))
-                action(x, z)
+          def applyToNonOverlappingChunks(firstRanges: (Range, Range), secondRanges: (Range, Range), action: (Int, Int)=>Unit): Unit ={
+            for(x <- firstRanges._1)
+              for(z <- firstRanges._2)
+                if(!(secondRanges._1.contains(x) && secondRanges._2.contains(z)))
+                  action(x, z)
+          }
+
+          applyToNonOverlappingChunks(lastRanges, currRanges, (x, y) => unloadChunk(x, y, player))
+          applyToNonOverlappingChunks(currRanges, lastRanges, (x, y) => loadChunk(x, y, player))
+
+          playersLastChunkUpdateLocation(player.uuid) = player.location
         }
 
-        applyToNonOverlappingChunks(lastRanges, currRanges, (x, y) => unloadChunk(x, y, player))
-        applyToNonOverlappingChunks(currRanges, lastRanges, (x, y) => loadChunk(x, y, player))
-
-        playersLastChunkUpdateLocation(player.uuid) = player.location
       }
     } else
       playersLastChunkUpdateLocation += (player.uuid -> player.location)
@@ -185,13 +192,17 @@ class World(chunkGenerator: ActorRef) extends Actor with ActorLogging{
       val centralX = pos.x >> 4
       val centralZ = pos.z >> 4
 
-      val dist = player.settings.viewDistance/2
+      player.settings foreach {plSettings =>
+        val dist = plSettings.viewDistance/2
 
-      for(x <- centralX - dist to centralX+dist)
-        for(z <- centralZ - dist to centralZ + dist){
-          //sender() ! getChunk(x, z)
-          loadChunk(x, z, player)
-        }
+        for(x <- centralX - dist to centralX+dist)
+          for(z <- centralZ - dist to centralZ + dist){
+            //sender() ! getChunk(x, z)
+            loadChunk(x, z, player)
+          }
+      }
+
+
 
     case JoinPlayer(p) =>
       players.foreach{pl =>
@@ -200,6 +211,25 @@ class World(chunkGenerator: ActorRef) extends Actor with ActorLogging{
       }
       entities += p
       players += p
+
+      //self ! LoadFirstChunks(p)
+      p.session ! Session.SendPacketToConnect(
+        JoinGamePacket(
+          gamemode = p.gameMode,
+          dimension = worldInfo.dimension,
+          difficulty = worldInfo.difficulty,
+          levelType = worldInfo.levelType
+        )
+      )
+      p.session ! Session.SendPacketToConnect(
+        PlayerPositionAndLookPacketClient(
+          spawnLocation.x,
+          spawnLocation.y,
+          spawnLocation.z,
+          spawnLocation.yaw,
+          spawnLocation.pitch
+        )
+      )
 
     case DisconnectPlayer(p, r) =>
       entities -= p

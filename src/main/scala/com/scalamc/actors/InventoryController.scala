@@ -1,7 +1,8 @@
 package com.scalamc.actors
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import com.scalamc.actors.InventoryController._
+import com.scalamc.models.enums.ClickType
 import com.scalamc.models.inventory.{InventoryItem, PlayerInventory}
 import com.scalamc.packets.Packet
 import com.scalamc.packets.game.player.inventory.{ClickWindowPacket, CreativeInventoryActionPacket, SetSlotPacket}
@@ -19,8 +20,14 @@ object InventoryController{
   case class UpdateInventory(inventory: PlayerInventory)
 }
 
-class InventoryController(session: ActorRef) extends Actor{
+class InventoryController(session: ActorRef) extends Actor with ActorLogging{
   var inventory: PlayerInventory = new PlayerInventory()
+
+  var currentItem: Option[InventoryItem] = None
+
+  def dropItem(item: InventoryItem, count: Byte) ={
+
+  }
 
   override def receive: Receive = {
     case SetSlot(slot, item) =>
@@ -36,10 +43,21 @@ class InventoryController(session: ActorRef) extends Actor{
 
     case HandleInventoryPacket(packet) =>
       packet match {
-        case p: ClickWindowPacket =>
+        case ClickWindowPacket(windowId, slot, button, actionNumber, mode, clickedItem) =>
+          ClickType(mode.int) match {
+            case ClickType.QUICK_MOVE if slot == -999 =>
+              currentItem foreach { item =>
+                if(actionNumber == 0) dropItem(item, 64)
+                if(actionNumber == 1) dropItem(item, 1)
+              }
+            case ClickType.QUICK_MOVE =>
 
-        case ac: CreativeInventoryActionPacket =>
+          }
 
+        case CreativeInventoryActionPacket(slot, item) =>
+          assert(slot >= 0)
+          if(item.itemId < 0) inventory.items(slot) = null
+          else inventory.items(slot) = InventoryItem(item)
       }
   }
 }

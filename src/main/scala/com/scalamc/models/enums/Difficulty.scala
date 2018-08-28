@@ -3,10 +3,10 @@ package com.scalamc.models.enums
 import com.scalamc.models.enums.PacketEnum.EnumVal
 
 object Difficulty extends Enumeration {
-  case class DifficultyVal(override var value: Any = 0) extends EnumVal
+  type Difficulty = EnumVal
 
-  val Peaceful = DifficultyVal(0.toByte)
-  val Easy = DifficultyVal(1.toByte)
-  val Normal = DifficultyVal(2.toByte)
-  val Hard = DifficultyVal(3.toByte)
+  val Peaceful = EnumVal(value = 0.toByte)
+  val Easy = EnumVal(value = 1.toByte)
+  val Normal = EnumVal(value = 2.toByte)
+  val Hard = EnumVal(value = 3.toByte)
 }

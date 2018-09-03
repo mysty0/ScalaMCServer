@@ -103,7 +103,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
           connect ! ConnectionHandler.HandlePlayPackets()
           //connect ! PlayerPositionAndLookPacketClient(0.0, 65.0)
           world ! World.JoinPlayer(player)
-          inventoryController ! InventoryController.SetSlot(44, new InventoryItem(1, count = 120))
+
           timeUpdateSchedule = context.system.scheduler.schedule(0 millisecond,10 second) {
             connect ! TimeUpdate(0,9999);//KeepAliveClientPacket(System.currentTimeMillis())
             //world ! GetPlayersPosition(player)
@@ -146,6 +146,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
     case p: ClientSettingsPacket =>
       player.settings = Some(new PlayerSettings(p))
       world ! World.LoadFirstChunks(player)
+      inventoryController ! InventoryController.SetSlot(44, new InventoryItem(1, count = 60))
 
     case p: TeleportConfirmPacket =>
 

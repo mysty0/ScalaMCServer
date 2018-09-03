@@ -88,7 +88,7 @@ class ChunkSection(){
 
   def getBlock(x: Int, y: Int, z: Int) = {
     val data = if(palette==null) blocks(index(x, y, z)) else palette(blocks(index(x, y, z)))
-    Block(data >> 4, (data & 0xF).toByte)
+    Block((data >> 4).toShort, (data & 0xF).toByte)
   }
 
 

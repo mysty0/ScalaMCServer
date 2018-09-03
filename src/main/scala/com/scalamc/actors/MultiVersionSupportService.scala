@@ -17,7 +17,7 @@ class MultiVersionSupportService(connectionHandler: ActorRef, implicit var proto
 
   val session = context.actorOf(Session.props(self), "session")
 
-  override def receive = {
+  override def receive =  {
     case p: KeepAliveServerPacket if protocolId >= 339 => ConnectionHandler.SendPacket(p)
     case p: KeepAliveServerPacket => ConnectionHandler.SendPacket(KeepAliveServerPacketOld(VarInt(p.id.toInt)))
 

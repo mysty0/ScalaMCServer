@@ -1,6 +1,7 @@
 package com.scalamc.actors
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.event.LoggingReceive
 import com.scalamc.actors.InventoryController._
 import com.scalamc.models.enums.ClickType
 import com.scalamc.models.inventory.{InventoryItem, PlayerInventory}
@@ -23,13 +24,22 @@ object InventoryController{
 class InventoryController(session: ActorRef) extends Actor with ActorLogging{
   var inventory: PlayerInventory = new PlayerInventory()
 
-  var currentItem: Option[InventoryItem] = None
+  var pickedItem: Option[InventoryItem] = None
 
   def dropItem(item: InventoryItem, count: Byte) ={
 
   }
 
-  override def receive: Receive = {
+  def copyItem(item: InventoryItem, count: Int): InventoryItem = new InventoryItem(item.id, item.metadata, count)
+
+
+  def printInventory(): Unit ={
+    for((el, ind) <- inventory.items.view.zipWithIndex)
+      println(ind+" "+el)
+  }
+
+
+  override def receive: Receive = LoggingReceive{
     case SetSlot(slot, item) =>
       inventory.items(slot) = item
       session ! Session.SendPacketToConnect(SetSlotPacket(0, slot.toShort, item.toRaw))
@@ -45,14 +55,50 @@ class InventoryController(session: ActorRef) extends Actor with ActorLogging{
       packet match {
         case ClickWindowPacket(windowId, slot, button, actionNumber, mode, clickedItem) =>
           ClickType(mode.int) match {
-            case ClickType.QUICK_MOVE if slot == -999 =>
-              currentItem foreach { item =>
-                if(actionNumber == 0) dropItem(item, 64)
-                if(actionNumber == 1) dropItem(item, 1)
+            case ClickType.Click =>
+              pickedItem orElse {
+                val item = inventory.items(slot)
+                button match {
+                  case 0 =>
+                    pickedItem = Some(item)
+                    inventory.items(slot) = null
+                  case 1 if item.count > 1 =>
+                    pickedItem = Some(copyItem(inventory.items(slot), count = Math.ceil(item.count/2.0).toByte))
+                    inventory.items(slot) = copyItem(inventory.items(slot), count = Math.floor(item.count/2.0).toByte)
+                  case 1 if item.count == 1 =>
+                    pickedItem = Some(item)
+                    inventory.items(slot) = null
+                }
+                None
+              } foreach { item =>
+                val itemInSlot = inventory.items(slot)
+                button match {
+                  case 0 if itemInSlot == null =>
+                    inventory.items(slot) = item
+                    pickedItem = None
+                  case 0 if itemInSlot != item =>
+                    inventory.items(slot) = item
+                    pickedItem = Some(itemInSlot)
+                  case 0 =>
+                    inventory.items(slot).count += item.count
+                    pickedItem = None
+                  case 1 if itemInSlot == null =>
+                    inventory.items(slot) = copyItem(item, count = 1)
+                    pickedItem = Some(copyItem(item, count = (item.count-1).toByte))
+                  case 1 if itemInSlot == item =>
+                    inventory.items(slot) = copyItem(item, count = inventory.items(slot).count+1)
+                    item.count -= 1
+                    //pickedItem = Some(item.copy(count = (item.count-1).toByte))
+                }
+
               }
-            case ClickType.QUICK_MOVE =>
+
+            case ClickType.MouseDrag =>
+              println("mouse drag packet "+packet)
 
           }
+          printInventory()
+          println(s"picked item: $pickedItem")
 
         case CreativeInventoryActionPacket(slot, item) =>
           assert(slot >= 0)

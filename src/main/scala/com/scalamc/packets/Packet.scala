@@ -100,33 +100,34 @@ abstract class Packet(val packetInfo: PacketInfo) {
     implicit val instMirror: universe.InstanceMirror = rm.reflect(obj)
 
     for((name, field) <- classFields){
-      readField(stack, name, field)
+      val res = readField(stack, name)
+      if(res != Unit) field := res
     }
   }
 
-  def readField(stack: ByteStack, name: Any, field: universe.TermSymbol)(implicit instMirror: universe.InstanceMirror): Unit ={
+  def readField(stack: ByteStack, name: Any): Any ={
     name match {
       case _: String =>
         val len = stack.popVarInt()
-        field := ByteString(stack.popWith(len).toArray).decodeString("utf-8")
+        ByteString(stack.popWith(len).toArray).decodeString("utf-8")
       case _: VarInt =>
-        field := VarInt(stack.popVarInt())
+        VarInt(stack.popVarInt())
       case _: Double =>
-        field := stack.popDouble()
+        stack.popDouble()
       case _: Float =>
-        field := stack.popFloat()
+        stack.popFloat()
       case _: Boolean =>
-        field := (if (stack.pop()==0) false else true)
+        if (stack.pop()==0) false else true
       case _: Long =>
-        field := stack.popLong()
+        stack.popLong()
       case _: Byte =>
-        field := stack.pop()
+        stack.pop()
       case _: Array[Byte] =>
-        field := stack.popWith(stack.popVarInt()).toArray
+        stack.popWith(stack.popVarInt()).toArray
       case _: Short =>
-        field := stack.popShort()
+        stack.popShort()
       case _: Int =>
-        field := stack.popInt()
+        stack.popInt()
       case _: com.scalamc.models.Position =>
         val value = stack.popLong()
         val x = value >> 38
@@ -135,7 +136,7 @@ abstract class Packet(val packetInfo: PacketInfo) {
         // unsigned
         // this shifting madness is used to preserve sign
         val z = value << 38 >> 38
-        field := com.scalamc.models.Position(x.toInt, y.toInt, z.toInt)
+        com.scalamc.models.Position(x.toInt, y.toInt, z.toInt)
 
 
         //println(e.enum.values.find(v => v.id == stack.pop().toInt))
@@ -144,11 +145,15 @@ abstract class Packet(val packetInfo: PacketInfo) {
       //  println("read enum")
       //  readField(stack, e.value, rm.reflect(e.value).symbol.asTerm)
       case _: TagCompound =>
-        field := readNBT(new ByteArrayInputStream(stack.toArray))._2
+        readNBT(new ByteArrayInputStream(stack.toArray))._2
       case op: Option[Any] =>
-        if(stack.nonEmpty) readFields(stack, op.get)
+        if(stack.nonEmpty){
+          return Some(readField(stack, op.get))
+        }
+        None
       case other =>
         readFields(stack, other)
+        Unit
     }
   }
 

@@ -147,6 +147,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       player.settings = Some(new PlayerSettings(p))
       world ! World.LoadFirstChunks(player)
       inventoryController ! InventoryController.SetSlot(44, new InventoryItem(1, count = 60))
+      inventoryController ! InventoryController.SetSlot(43, new InventoryItem(2, count = 60))
 
     case p: TeleportConfirmPacket =>
 

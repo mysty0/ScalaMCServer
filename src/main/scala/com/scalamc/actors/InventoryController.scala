@@ -6,7 +6,7 @@ import com.scalamc.actors.InventoryController._
 import com.scalamc.models.enums.ClickType
 import com.scalamc.models.inventory.{InventoryItem, PlayerInventory}
 import com.scalamc.packets.Packet
-import com.scalamc.packets.game.player.inventory.{ClickWindowPacket, CreativeInventoryActionPacket, SetSlotPacket}
+import com.scalamc.packets.game.player.inventory.{ClickWindowPacket, ConfirmTransactionServerPacket, CreativeInventoryActionPacket, SetSlotPacket}
 
 object InventoryController{
   def props(session: ActorRef) = Props(
@@ -54,8 +54,10 @@ class InventoryController(session: ActorRef) extends Actor with ActorLogging{
     case HandleInventoryPacket(packet) =>
       packet match {
         case ClickWindowPacket(windowId, slot, button, actionNumber, mode, clickedItem) =>
+          println(clickedItem.itemId+ " count "+clickedItem.itemCount)
           ClickType(mode.int) match {
             case ClickType.Click =>
+              session ! Session.SendPacketToConnect(ConfirmTransactionServerPacket(windowId, actionNumber, inventory.items(slot) == InventoryItem(clickedItem)))
               pickedItem orElse {
                 val item = inventory.items(slot)
                 button match {
@@ -84,12 +86,15 @@ class InventoryController(session: ActorRef) extends Actor with ActorLogging{
                     pickedItem = None
                   case 1 if itemInSlot == null =>
                     inventory.items(slot) = copyItem(item, count = 1)
-                    pickedItem = Some(copyItem(item, count = (item.count-1).toByte))
-                  case 1 if itemInSlot == item =>
-                    inventory.items(slot) = copyItem(item, count = inventory.items(slot).count+1)
                     item.count -= 1
-                    //pickedItem = Some(item.copy(count = (item.count-1).toByte))
+                  case 1 if itemInSlot == item =>
+                    inventory.items(slot) = copyItem(item, count = itemInSlot.count+1)
+                    item.count -= 1
+                  case 1 =>
+                    inventory.items(slot) = item
+                    pickedItem = Some(itemInSlot)
                 }
+                if(item.count <= 0) pickedItem = None
 
               }
 

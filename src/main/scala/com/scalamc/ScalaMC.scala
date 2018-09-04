@@ -4,7 +4,7 @@ import akka.actor.{ActorSystem, Props}
 import com.scalamc.actors._
 import com.scalamc.actors.world.{World, WorldController}
 import com.scalamc.actors.world.generators.FlatGenerator
-import com.scalamc.models.inventory.Items
+import com.scalamc.models.inventory.{InventoryItem, Items}
 
 
 /**
@@ -26,5 +26,4 @@ object ScalaMC extends App{
 
   val pluginController = actorSystem.actorOf(PluginController.props(), "pluginController")
   pluginController ! PluginController.LoadPluginsFromDir("plugins")
-
 }

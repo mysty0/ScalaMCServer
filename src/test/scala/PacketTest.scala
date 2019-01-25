@@ -36,7 +36,7 @@ class PacketTest extends FunSuite with GivenWhenThen with Matchers {
     Packet
     When("get")
     //packet.read(buffer)
-    println(s"name ${Packet.packets.last._2.newInstance()}")
+    //println(s"name ${Packet.packets.last._2.newInstance()}")
     Then("the get complite")
     assert(Packet.packets.nonEmpty)
   }

@@ -3,10 +3,15 @@ package com.scalamc.actors
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.event.LoggingReceive
 import com.scalamc.actors.InventoryController._
+import com.scalamc.models.ProtocolEvents
 import com.scalamc.models.enums.ClickType
 import com.scalamc.models.inventory.{InventoryItem, PlayerInventory}
 import com.scalamc.packets.Packet
 import com.scalamc.packets.game.player.inventory.{ClickWindowPacket, ConfirmTransactionServerPacket, CreativeInventoryActionPacket, SetSlotPacket}
+
+object DragMode extends Enumeration{
+  val LeftMouse, RightMouse = Value
+}
 
 object InventoryController{
   def props(session: ActorRef) = Props(
@@ -25,6 +30,8 @@ class InventoryController(session: ActorRef) extends Actor with ActorLogging{
   var inventory: PlayerInventory = new PlayerInventory()
 
   var pickedItem: Option[InventoryItem] = None
+  var dragMode: Int = 0
+  var dragSlots: Map[Int, InventoryItem] = Map()
 
   def dropItem(item: InventoryItem, count: Byte) ={
 
@@ -42,7 +49,7 @@ class InventoryController(session: ActorRef) extends Actor with ActorLogging{
   override def receive: Receive = LoggingReceive{
     case SetSlot(slot, item) =>
       inventory.items(slot) = item
-      session ! Session.SendPacketToConnect(SetSlotPacket(0, slot.toShort, item.toRaw))
+      session ! Session.SendEvent(ProtocolEvents.SetSlotItem(0, slot, item))//Session.SendPacketToConnect(SetSlotPacket(0, slot.toShort, item.toRaw))
       session ! UpdateInventory(inventory)
     case SetInventory(inv) =>
       inv.items.indices.foreach(i => if(inventory.items(i) != inv.items(i)) session ! Session.SendPacketToConnect(SetSlotPacket(0, i.toShort, inv.items(i).toRaw)))

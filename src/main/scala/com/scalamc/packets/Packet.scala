@@ -4,7 +4,7 @@ import java.io.{ByteArrayInputStream, DataOutput, DataOutputStream, File}
 import java.util.UUID
 
 import akka.util.ByteString
-import com.scalamc.models.Position
+import com.scalamc.models.{Position, ProtocolVersion}
 import com.scalamc.models.utils.VarLong
 import com.scalamc.models.enums.PacketEnum
 import com.scalamc.models.enums.PacketEnum.EnumVal
@@ -14,6 +14,7 @@ import com.scalamc.utils.{ByteBuffer, ByteStack, ClassFieldsCache}
 import com.scalamc.utils.BytesUtils._
 import com.xorinc.scalanbt.tags._
 import com.xorinc.scalanbt.io._
+import enumeratum.{CirceEnum, EnumEntry}
 import org.clapper.classutil.{ClassFinder, ClassInfo}
 
 import scala.util.Try
@@ -22,23 +23,62 @@ import org.reflections.Reflections
 
 import scala.annotation.ClassfileAnnotation
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.api.JavaUniverse
 
 
-object PacketState extends Enumeration {
-  val Login, Playing, Status = Value
-}
-object PacketDirection extends Enumeration {
-  val Server, Client = Value
+sealed trait PacketDirection extends EnumEntry
+
+case object PacketDirection extends enumeratum.Enum[PacketDirection] with CirceEnum[PacketDirection] {
+  case object Server  extends PacketDirection
+  case object Client extends PacketDirection
+
+  val values = findValues
 }
 
-case class PacketInfo(var ids: Map[Int, Byte],
-                      state: PacketState.Value = PacketState.Playing,
-                      direction: PacketDirection.Value)
 
+sealed trait PacketState extends EnumEntry
+
+case object PacketState extends enumeratum.Enum[PacketState] with CirceEnum[PacketState] {
+  case object Login  extends PacketState
+  case object Playing extends PacketState
+  case object Status  extends PacketState
+
+  val values = findValues
+}
+
+//object PacketState extends Enumeration {
+//  val Login, Playing, Status = Value
+//}
+//object PacketDirection extends Enumeration {
+//  val Server, Client = Value
+//}
+
+case class PacketInfo(var id: Int,
+                      state: PacketState = PacketState.Playing,
+                      direction: PacketDirection){
+  override def equals(obj: scala.Any): Boolean ={
+    obj match {
+      case inf: PacketInfo =>
+        inf.id == id && inf.direction == direction && inf.state == state
+      case _ =>
+        false
+    }
+  }
+}
 
 object Packet{
+
+  var protocols: Map[Int, Map[PacketInfo, Packet]] = Map(-1 -> packets)
+  var protocolVersions: Map[Int, ProtocolVersion] = Map()
+
+  def updateProtocols(newProtocols: Map[Int, Map[PacketInfo, _ <: Packet]] ): Unit ={
+    protocols = newProtocols + (-1 -> packets)
+    println("update protocols"+protocols.filter(p => p._1 != -1))
+    println(protocols(-1).find(_._1.id == 0x04).get._2.getClass)
+    protocols foreach {p => println(p._1)}
+  }
 
   def newInstance(className: String): Option[Packet] = Try {
     val m = universe.runtimeMirror(getClass.getClassLoader)
@@ -49,20 +89,41 @@ object Packet{
     }
   }.toOption
 
-  lazy val packets = {
-
+  lazy val packets: Map[PacketInfo, _ <: Packet] = {
     val reflections = new Reflections("com.scalamc.packets")
     val subclasses = reflections.getSubTypesOf(classOf[Packet])
 
-    subclasses.asScala map (p=> (p.newInstance().packetInfo, p))
+    subclasses.asScala map {p => val pac = p.newInstance(); pac.packetInfo -> pac} toMap
   }
 
-  def getPacket(id: Byte, protocolId: Int, state: PacketState.Value = PacketState.Playing, direction: PacketDirection.Value = PacketDirection.Server) =
-    packets.find((p) => (p._1.ids(protocolId) == id || p._1.ids(-1) == id) && p._1.state == state && p._1.direction == direction).get._2
+  def getNewPacketId(packetInfo: PacketInfo, protocolVersion: Int): Int = {
+    if(protocols.contains(protocolVersion)) protocols(protocolVersion).find(pc => pc._1 == packetInfo).map(p => p._2.packetInfo).getOrElse(packetInfo).id
+    else packetInfo.id
+  }
+
+  def getPacket(id: Byte, protocolId: Int, state: PacketState = PacketState.Playing, direction: PacketDirection = PacketDirection.Server): Packet ={
+    //if(protocols.contains(protocolId))
+    //packets.find((p) => (p._1.ids(protocolId) == id || p._1.ids(-1) == id) && p._1.state == state && p._1.direction == direction).get._2
+    val info = PacketInfo(id, state, direction)
+    if(protocols.contains(protocolId)) {
+      val pack = protocols(protocolId).find(pc => pc._2.packetInfo == info).getOrElse(protocols(-1).find(pc => pc._1 == info).orNull)
+      if(pack._1 == null) protocols(-1).find(pc => pc._1 == info).orNull._2
+      else if(pack._2 == null) protocols(-1).find(pc => pc._1 == PacketInfo(pack._1.id, state, direction)).orNull._2
+      else pack._2
+    } else{
+      try {
+        protocols(-1).find(pc => pc._1 == info).orNull._2
+      } catch {
+        case _: Exception => throw new IllegalStateException(s"Cannot find packet (id: $id direction: $direction protocolId: $protocolId state: $state)")
+      }
+    }
+      //val pack = protocols.getOrElse(protocolId, protocols(-1)).find(pc => pc._1 == PacketInfo(id, state, direction)).orElse(protocols(-1).find(pc => pc._1 == PacketInfo(id, state, direction))).orNull._2
+
+  }
 
 
-  def fromByteBuffer(buf: ByteBuffer, state: PacketState.Value = PacketState.Playing)(implicit protocolId: Int): Packet ={
-    val packet = getPacket(buf(0),protocolId, state).newInstance()
+  def fromByteBuffer(buf: ByteBuffer, state: PacketState = PacketState.Playing)(implicit protocolId: Int): Packet ={
+    val packet = getPacket(buf(0),protocolId, state)
     buf.remove(0)
     packet.read(buf)
     packet
@@ -77,15 +138,15 @@ object Packet{
 
 abstract class Packet(val packetInfo: PacketInfo) {
   import scala.reflect.runtime.universe._
-
+  override def clone: Packet = this.getClass.newInstance()
   implicit class TermSymbolExtend(ts: TermSymbol)(implicit instanceMirror: InstanceMirror){
-    implicit def :=(any: Any) = instanceMirror.reflectField(ts).set(any)
+    implicit def :=(any: Any): Unit = instanceMirror.reflectField(ts).set(any)
   }
 
   val instanceMirror: universe.InstanceMirror = rm.reflect(this)
 
   //Set default id
-  packetInfo.ids = packetInfo.ids.withDefault(_ => 0xFF.toByte)
+  //packetInfo.ids = packetInfo.ids.withDefault(_ => 0xFF.toByte)
 
   //val fields: List[(Any, universe.TermSymbol)] =
 
@@ -160,8 +221,10 @@ abstract class Packet(val packetInfo: PacketInfo) {
   def write()(implicit protocolId: Int): ByteBuffer ={
     var buff: ByteBuffer = new ByteBuffer()
 
-    var id = packetInfo.ids(protocolId)
-    buff += (if(id==0xFF.toByte) packetInfo.ids(-1) else id)
+    //var id = packetInfo.ids(protocolId)
+    //buff += (if(id==0xFF.toByte) packetInfo.ids(-1) else id)
+    buff += Packet.getNewPacketId(packetInfo, protocolId).toByte//packetInfo.id.toByte
+    //println("id",Packet.getNewPacketId(packetInfo, protocolId),this)
 
     buff += writeFields(ClassFieldsCache.getFields(this), instanceMirror, isMetadata = false).toArray
 

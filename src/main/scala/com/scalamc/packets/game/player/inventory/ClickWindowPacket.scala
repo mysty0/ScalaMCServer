@@ -9,7 +9,6 @@ case class ClickWindowPacket(var windowId: Byte = 0,
                              var actionNumber: Short = 0,
                              var mode: VarInt = VarInt(0),
                              var clickedItem: SlotRaw = new SlotRaw())
-  extends Packet(PacketInfo(Map(335 -> 0x08.toByte,
-                                340 -> 0x07.toByte), direction = PacketDirection.Server)){
+  extends Packet(PacketInfo(0x07.toByte, direction = PacketDirection.Server)){
   def this(){this(0)}
 }

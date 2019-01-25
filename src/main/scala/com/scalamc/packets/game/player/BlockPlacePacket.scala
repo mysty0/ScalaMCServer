@@ -10,6 +10,6 @@ case class BlockPlacePacket(var position: Position = Position(),
                             var cursorPositionX: Float = 0,
                             var cursorPositionY: Float = 0,
                             var cursorPositionZ: Float = 0)
-  extends Packet(PacketInfo(Map(-1 -> 0x1F.toByte), direction = PacketDirection.Server)){
+  extends Packet(PacketInfo(0x1F.toByte, direction = PacketDirection.Server)){
   def this(){this(Position())}
 }

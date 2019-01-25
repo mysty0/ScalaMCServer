@@ -14,6 +14,6 @@ case class SpawnPlayerPacket(var id: VarInt = VarInt(0),
                              var yaw: Byte = 0x00.toByte,
                              var pitch: Byte = 0x00.toByte,
                              var metadata: EntityMetadataRaw = new EntityMetadataRaw())
-  extends Packet(PacketInfo(Map(-1 -> 0x05.toByte), direction = PacketDirection.Client)) {
+  extends Packet(PacketInfo(0x05.toByte, direction = PacketDirection.Client)) {
   def this(){this(VarInt(0))}
 }

@@ -7,7 +7,7 @@ case class Handshake(var protocolVersion: VarInt = VarInt(0),
                      var serverAddress: String = "",
                      var serverPort:Short = 0,
                      var nextState:VarInt = VarInt(0))
-  extends Packet(PacketInfo(Map(-1 -> 0x00.toByte), PacketState.Status, PacketDirection.Server)){
+  extends Packet(PacketInfo(0x00.toByte, PacketState.Status, PacketDirection.Server)){
 
   def this(){this(VarInt(0))}
 }

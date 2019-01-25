@@ -9,7 +9,7 @@ import scala.collection.mutable.ArrayBuffer
 
 case class PlayerListItemPacket(var action: VarInt = VarInt(0),
                                 var actions: ArrayBuffer[PlayerItem] = new ArrayBuffer[PlayerItem]())
-  extends Packet(PacketInfo(Map(-1 -> 0x2D.toByte), direction = PacketDirection.Client)){
+  extends Packet(PacketInfo(0x2D.toByte, direction = PacketDirection.Client)){
   def this(){this(VarInt(0))}
 }
 

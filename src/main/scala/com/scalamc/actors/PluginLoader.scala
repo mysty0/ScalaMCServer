@@ -5,6 +5,7 @@ import java.net.URI
 
 import akka.actor.{Actor, Props}
 import com.scalamc.models.{Plugin, PluginInfo}
+import com.scalamc.utils.ModulesLoader
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.parser._
@@ -24,19 +25,9 @@ object PluginLoader{
 
 class PluginLoader extends Actor{
   import com.scalamc.actors.PluginLoader._
-
-  def getListOfFiles(dir: String): List[URI] = {
-    val file = new File(dir)
-    if(file.exists())
-      file.listFiles.filter(_.isFile)
-        .filter(_.getName.endsWith(".jar"))
-        .map(_.toURI).toList
-    else List()
-  }
-
   override def receive: Receive = {
     case LoadPlugins(dir) =>
-      val classLoader = new java.net.URLClassLoader(getListOfFiles(dir).map(_.toURL).toArray, this.getClass.getClassLoader)
+      val classLoader = ModulesLoader.getClassLoader(dir)//new java.net.URLClassLoader(getListOfFiles(dir).map(_.toURL).toArray, this.getClass.getClassLoader)
       val pluginInfos = classLoader.findResources("plugin.info")
 
       var plugins: ArrayBuffer[Plugin] = ArrayBuffer()

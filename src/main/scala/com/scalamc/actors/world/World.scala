@@ -150,7 +150,7 @@ class World(chunkGenerator: ActorRef, worldInfo: WorldInfo) extends Actor with A
   }
 
   def processEvent: Receive = {
-    case SendPacketToAllPlayers(p) => players.foreach(_.session ! p)
+    case SendPacketToAllPlayers(p) => players.foreach(_.session ! Session.SendPacketToConnect(p))
 
     case SetBlock(pos, block) =>
       getChunk(pos.x >> 4, pos.z >> 4) foreach {_.setBlock(pos.toChunkRelativePosition, block)}
@@ -201,9 +201,6 @@ class World(chunkGenerator: ActorRef, worldInfo: WorldInfo) extends Actor with A
             loadChunk(x, z, player)
           }
       }
-
-
-
     case JoinPlayer(p) =>
       players.foreach{pl =>
           pl.session ! Session.AddNewPlayer(p)

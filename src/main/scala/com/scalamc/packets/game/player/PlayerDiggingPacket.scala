@@ -7,7 +7,7 @@ import com.scalamc.packets.{Packet, PacketDirection, PacketInfo}
 case class PlayerDiggingPacket(var status: VarInt = VarInt(0),
                                var position: Position = Position(),
                                var face: Byte = 0)
-  extends Packet(PacketInfo(Map(340 -> 0x14.toByte, 335 -> 0x14.toByte), direction = PacketDirection.Server)){
+  extends Packet(PacketInfo(0x14.toByte, direction = PacketDirection.Server)){
   def this(){this(VarInt(0))}
 
 }

@@ -8,7 +8,7 @@ case class SpawnExperienceOrbPacket(var entityId: VarInt = 0,
                                     var y: Double = 0,
                                     var z: Double = 0,
                                     var count: Short = 0)
-  extends Packet(PacketInfo(Map(-1 -> 0x01.toByte), direction = PacketDirection.Client)) {
+  extends Packet(PacketInfo(0x01.toByte, direction = PacketDirection.Client)) {
 
   def this(){this(0)}
 }

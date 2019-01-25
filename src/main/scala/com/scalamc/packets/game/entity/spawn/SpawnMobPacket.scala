@@ -16,7 +16,7 @@ case class SpawnMobPacket(var entityId: VarInt = 0,
                           var velocityY: Short = 0,
                           var velocityZ: Short = 0,
                           var metadata: EntityMetadataRaw = new EntityMetadataRaw())
-  extends Packet(PacketInfo(Map(-1 -> 0x03.toByte), direction = PacketDirection.Client)) {
+  extends Packet(PacketInfo(0x03.toByte, direction = PacketDirection.Client)) {
   def this(){this(VarInt(0))}
 
 }

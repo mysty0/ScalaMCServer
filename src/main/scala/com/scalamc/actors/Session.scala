@@ -41,6 +41,7 @@ object Session{
   )
 
   case class SendPacketToConnect(packet: Packet)
+  case class SendEvent(event: ProtocolEvents.ProtocolEvent)
 
   case class DisconnectSession(reason: Chat)
   case class DisconnectPlayer(player: Player)
@@ -52,6 +53,22 @@ object Session{
   case class AnimationEntity(entityId: Int, animationId: Byte)
   case class LoadChunk(chunk: Chunk)
   case class UnloadChunk(x: Int, z: Int)
+
+  //Packet events
+  case class LoginStart(name: String)
+  case class KeepAlive(id:Long)
+  case class SetPlayerLocation(location: Location, onGround: Boolean)
+  case class SetPlayerPosition(x: Double, y: Double, z: Double, onGround: Boolean)
+  case class SetPlayerRotation(yaw: Float, pitch: Float, onGround: Boolean)
+  case class AnimatePlayerHand(hand: Int)
+  case class UpdateSettings(var locale: String = "",
+                            var viewDistance: Byte = 0,
+                            var chatMode: VarInt = VarInt(0),
+                            var chatColors: Boolean = true,
+                            var displayedSkinParts: Byte = 0,
+                            var mainHand: VarInt = VarInt(0))
+  case class TeleportConfirm(id: Int)
+
 }
 
 class Session(connect: ActorRef) extends Actor with ActorLogging {
@@ -87,7 +104,7 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
   }
 
   def processPacket: Receive = {
-    case p: LoginStartPacket =>
+    case p: LoginStart =>
       val future = ScalaMC.entityIdManager ? EntityIdManager.GetId
       Await.result(future, timeout.duration) match{
         case id: Int =>
@@ -126,30 +143,29 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
       chatHandler ! ChatHandler.NewMessage(msg, player)
     case TabCompleteRequestPacket(command, assumeCommand, blockPosition) =>
       chatHandler ! ChatHandler.TabCompleteRequest(command, assumeCommand, player)
-    case p: KeepAliveClientPacket =>
+    case p: KeepAlive =>
       //connect ! Write(KeepAliveServerPacket(p.id))
       println("recive keep alive",p.id)
 
-    case p: PlayerPositionAndLookPacketServer =>
-      world ! World.UpdateEntityPositionAndLook(player.entityId, Location(p.x, p.y, p.z, p.yaw, p.pitch))
-    case p: PlayerPositionPacket =>
+    case p: SetPlayerLocation =>
+      world ! World.UpdateEntityPositionAndLook(player.entityId, p.location)
+    case p: SetPlayerRotation =>
+      world ! World.UpdateEntityLook(player.entityId, Location(player.location.x, player.location.y, player.location.z, p.yaw, p.pitch))
+    case p: SetPlayerPosition =>
       world ! World.UpdateEntityPosition(player.entityId, Location(p.x, p.y, p.z, player.location.yaw, player.location.pitch))
 
-    case p: PlayerLookPacket =>
-      world ! World.UpdateEntityLook(player.entityId, Location(player.location.x, player.location.y, player.location.z, p.yaw, p.pitch))
-
-    case AnimationPacketServer(hand) =>
-      world ! World.AnimateEntity(player.entityId, if(hand.int == 0) 0 else 3)
+    case AnimatePlayerHand(hand) =>
+      world ! World.AnimateEntity(player.entityId, if(hand == 0) 0 else 3)
     case AnimationEntity(eId, aId) =>
       connect ! AnimationPacketClient(eId, aId)
 
-    case p: ClientSettingsPacket =>
+    case p: UpdateSettings =>
       player.settings = Some(new PlayerSettings(p))
       world ! World.LoadFirstChunks(player)
       inventoryController ! InventoryController.SetSlot(44, new InventoryItem(1, count = 60))
       inventoryController ! InventoryController.SetSlot(43, new InventoryItem(2, count = 60))
 
-    case p: TeleportConfirmPacket =>
+    case p: TeleportConfirm =>
 
     case RelativeMove(id, x, y, z) =>
       connect ! EntityRelativeMovePacket(id, x, y, z)
@@ -204,7 +220,10 @@ class Session(connect: ActorRef) extends Actor with ActorLogging {
     case SendPacketToConnect(packet) =>
       connect ! packet
 
-    case _ =>
+    case SendEvent(event) =>
+      connect ! event
+
+    case o => println("receive other "+o)
 
   }
 }

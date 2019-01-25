@@ -34,7 +34,7 @@ case class PlayerSettings(var locale: String,
                           var chatColors: Boolean,
                           var displayesSkinParts: Byte,
                           var mainHand: Byte){
-  def this(packet: ClientSettingsPacket){
+  def this(packet: Session.UpdateSettings){
     this(packet.locale,
       packet.viewDistance,
       ChatMode(packet.chatMode.int),

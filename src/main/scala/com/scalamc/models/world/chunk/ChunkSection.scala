@@ -48,7 +48,7 @@ class ChunkSection(){
     else blocks = new VariableValueArray(ChunkSection.GLOBAL_PALETTE_BITS_PER_BLOCK, ChunkSection.ARRAY_SIZE)
   }
 
-  def isEmpty = {count == 0}
+  def isEmpty: Boolean = {count == 0}
 
   def index(x: Int, y: Int, z: Int): Int = (y & 0xf) << 8 | z << 4 | x
 
@@ -86,7 +86,7 @@ class ChunkSection(){
     blocks(index(x, y, z)) = encoded
   }
 
-  def getBlock(x: Int, y: Int, z: Int) = {
+  def getBlock(x: Int, y: Int, z: Int): Block = {
     val data = if(palette==null) blocks(index(x, y, z)) else palette(blocks(index(x, y, z)))
     Block((data >> 4).toShort, (data & 0xF).toByte)
   }

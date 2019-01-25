@@ -2,7 +2,7 @@ name := "ScalaMCServer"
 
 version := "1.0"
 
-scalaVersion := "2.12.1"
+scalaVersion := "2.12.1"//2.12.1
 
 scalacOptions ++= Seq(
   "-feature"
@@ -19,6 +19,10 @@ libraryDependencies ++= Seq(
   "io.circe" %% "circe-generic",
   "io.circe" %% "circe-parser"
 ).map(_ % circeVersion)
+
+libraryDependencies ++= Seq(
+  "com.beachape" %% "enumeratum-circe" % "1.5.13"
+)
 
 resolvers += Resolver.sonatypeRepo("releases")
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)

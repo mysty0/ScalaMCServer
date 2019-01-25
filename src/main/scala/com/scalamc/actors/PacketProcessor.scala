@@ -23,6 +23,7 @@ class PacketProcessor() extends Actor with ActorLogging{
       } catch {
         case e: Exception =>
           log.error("Packet parse error "+e)
+          e.printStackTrace()
       }
   }
 }

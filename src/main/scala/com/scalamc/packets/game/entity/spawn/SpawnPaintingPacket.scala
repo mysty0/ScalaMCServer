@@ -11,7 +11,7 @@ case class SpawnPaintingPacket(var entityId: VarInt = 0,
                                var title: String = "",
                                var position: Position = Position(),
                                var direction: Byte = 0)
-  extends Packet(PacketInfo(Map(-1 -> 0x04.toByte), direction = PacketDirection.Client)) {
+  extends Packet(PacketInfo(0x04.toByte, direction = PacketDirection.Client)) {
 
   def this(){this(0)}
 }

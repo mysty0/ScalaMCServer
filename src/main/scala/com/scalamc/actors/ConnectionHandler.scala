@@ -66,7 +66,10 @@ class ConnectionHandler extends Actor with ActorLogging with Stash {
   def waitLogin: Receive = {
     case HandleLoginPackets(protId) =>
       protocolId = protId
-      session = Some(context.actorOf(MultiVersionSupportService.props(self, protocolId), "MultiVersionSupportService"))
+      //val defProps =
+      log.info("set protocol id {}", protocolId)
+      val resolver = Packet.protocolVersions.get(protId).flatMap(_.resolver.map(Props(_, self, protId))).getOrElse(DefaultProtocolResolver.props(self, protocolId))
+      session = Some(context.actorOf(resolver))//MultiVersionSupportService.props(self, protocolId), "MultiVersionSupportService"))
       context.become(handlePackets orElse login)
       unstashAll()
 
@@ -101,6 +104,7 @@ class ConnectionHandler extends Actor with ActorLogging with Stash {
       } catch {
         case e: Exception =>
           log.error("Packet parse error2 "+e)
+          e.printStackTrace()
       }
     //if(session.isDefined) session.get ! Packet.fromByteBuffer(pack, PacketState.Playing)
 

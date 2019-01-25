@@ -5,7 +5,7 @@ import akka.io.Tcp.Write
 import com.scalamc.actors.ConnectionHandler.Disconnect
 import com.scalamc.models.utils.VarInt
 import com.scalamc.packets.{Packet, PacketDirection}
-import com.scalamc.packets.game.{KeepAliveClientPacket, KeepAliveClientPacketOld, KeepAliveServerPacket, KeepAliveServerPacketOld}
+import com.scalamc.packets.game.{KeepAliveClientPacket, KeepAliveServerPacket}
 
 object MultiVersionSupportService{
   def props(connectionHandler: ActorRef, protocolId: Int = 0) = Props(
@@ -19,10 +19,10 @@ class MultiVersionSupportService(connectionHandler: ActorRef, implicit var proto
 
   override def receive =  {
     case p: KeepAliveServerPacket if protocolId >= 339 => ConnectionHandler.SendPacket(p)
-    case p: KeepAliveServerPacket => ConnectionHandler.SendPacket(KeepAliveServerPacketOld(VarInt(p.id.toInt)))
+    //case p: KeepAliveServerPacket => ConnectionHandler.SendPacket(KeepAliveServerPacketOld(VarInt(p.id.toInt)))
 
     case p: KeepAliveClientPacket if protocolId >= 339 => session ! p
-    case p: KeepAliveClientPacketOld => ConnectionHandler.SendPacket(KeepAliveServerPacket(p.id.int.toLong))
+    //case p: KeepAliveClientPacketOld => ConnectionHandler.SendPacket(KeepAliveServerPacket(p.id.int.toLong))
 
     case d: Disconnect =>
       session ! Disconnect()
